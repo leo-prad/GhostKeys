@@ -1,0 +1,53 @@
+name: GhostKeys
+options:
+  bundleIdPrefix: com.ghostkeys
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: ""     # Fill in with your Apple Developer team ID or leave blank for personal team
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  GhostKeys:
+    type: application
+    platform: iOS
+    sources:
+      - path: GhostKeys
+      - path: Shared
+    resources:
+      - path: GhostKeys/Assets.xcassets
+        optional: true
+    info:
+      path: GhostKeys/Info.plist
+    entitlements:
+      path: GhostKeys/GhostKeys.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ghostkeys.host
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        TARGETED_DEVICE_FAMILY: "1"
+    dependencies:
+      - target: GhostKeyboard
+
+  GhostKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: GhostKeyboard
+      - path: Shared
+    resources:
+      - path: GhostKeyboard/Resources/lexicon.json
+    info:
+      path: GhostKeyboard/Info.plist
+    entitlements:
+      path: GhostKeyboard/GhostKeyboard.entitlements
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ghostkeys.host.keyboard
+        TARGETED_DEVICE_FAMILY: "1"
