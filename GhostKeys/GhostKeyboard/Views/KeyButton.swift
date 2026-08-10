@@ -65,13 +65,15 @@ final class KeyButton: UIView {
         if definition.type == .letter, let firstHold = definition.holdCharacters.first {
             hintLabel.translatesAutoresizingMaskIntoConstraints = false
             hintLabel.textAlignment = .right
-            hintLabel.font = .systemFont(ofSize: 10, weight: .bold)
-            hintLabel.textColor = theme.keyTextColor.withAlphaComponent(0.40)
+            hintLabel.font = .systemFont(ofSize: 10, weight: .semibold)
+            hintLabel.textColor = theme.keyTextColor.withAlphaComponent(0.45)
             hintLabel.text = firstHold
             addSubview(hintLabel)
             NSLayoutConstraint.activate([
-                hintLabel.topAnchor.constraint(equalTo: topAnchor, constant: 2),
-                hintLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -3)
+                hintLabel.topAnchor.constraint(equalTo: topAnchor, constant: 3),
+                hintLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),
+                hintLabel.widthAnchor.constraint(equalToConstant: 14),
+                hintLabel.heightAnchor.constraint(equalToConstant: 12)
             ])
         }
 
@@ -107,7 +109,7 @@ final class KeyButton: UIView {
     func apply(theme: KeyboardTheme) {
         self.theme = theme
         label.textColor = theme.keyTextColor
-        hintLabel.textColor = theme.keyTextColor.withAlphaComponent(0.40)
+        hintLabel.textColor = theme.keyTextColor.withAlphaComponent(0.45)
         iconImageView.tintColor = theme.keyTextColor
         layer.shadowColor = theme.keyShadowColor.cgColor
         applyBackground()

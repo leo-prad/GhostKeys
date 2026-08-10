@@ -16,6 +16,7 @@ final class KeyboardViewController: UIInputViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
+        view.clipsToBounds = false
 
         let theme = ThemeManager.theme(for: traitCollection.userInterfaceStyle)
 

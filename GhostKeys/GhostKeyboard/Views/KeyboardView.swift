@@ -20,6 +20,7 @@ final class KeyboardView: UIView {
     private var popup: PopupKeyView?
     private var popupOwner: KeyButton?
     private var holdTimer: Timer?
+    private var didDragInPopup = false
     private var holdThreshold: TimeInterval {
         return max(0.15, SharedDefaults.double(SharedDefaults.Key.holdDelayMs, default: 350) / 1000.0)
     }
@@ -31,6 +32,7 @@ final class KeyboardView: UIView {
         self.state = state
         self.theme = theme
         super.init(frame: .zero)
+        clipsToBounds = false
         backgroundColor = theme.keyboardBackground
         buildRows()
     }
@@ -130,10 +132,13 @@ final class KeyboardView: UIView {
                 continue
             }
 
-            // Row 3 of Letters page (shift + 7 letters + backspace): stretch shift and backspace to touch side margins
-            let isLettersRow3 = (r == 2 && state.page == .letters && row.first?.definition.type == .shift)
+            // For Row 3 of ALL pages (letters, symbols1, symbols2):
+            // Stretch the leftmost and rightmost keys so Row 3 touches side margins edge-to-edge!
+            let firstType = row.first?.definition.type
+            let lastType = row.last?.definition.type
+            let isRow3 = (r == 2 && (firstType == .shift || firstType == .switchMode) && lastType == .backspace)
 
-            if isLettersRow3 && row.count > 2 {
+            if isRow3 && row.count > 2 {
                 let middleCount = row.count - 2
                 let totalSpacing = CGFloat(row.count - 1) * hSpacing
                 let sideKeyW = (usableW - totalSpacing - CGFloat(middleCount) * baseW) / 2.0
@@ -147,7 +152,7 @@ final class KeyboardView: UIView {
                 continue
             }
 
-            // Standard layout (10 keys, 9 keys centered, or symbols row 3 centered with 1.35 multiplier for side keys)
+            // Standard layout (10 keys or 9 keys centered)
             var totalMul: CGFloat = 0
             for k in row { totalMul += k.definition.widthMultiplier }
             let totalSpacing = CGFloat(row.count - 1) * hSpacing
@@ -168,25 +173,43 @@ final class KeyboardView: UIView {
         let chars = key.definition.holdCharacters
         guard !chars.isEmpty else { return }
 
+        didDragInPopup = false
         let popup = PopupKeyView(theme: theme)
         popup.configure(holdCharacters: chars)
+        popup.onSelectCharacter = { [weak self, weak key] resolved in
+            guard let self = self, let key = key else { return }
+            self.delegate?.keyboardView(self, didHold: key.definition, resolved: resolved)
+            self.cancelPopup()
+        }
+
+        // Add popup to the parent view or window so it floats above suggestionBar without top clipping
+        let targetParent: UIView = superview ?? self
+        targetParent.clipsToBounds = false
         popup.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(popup)
+        targetParent.addSubview(popup)
 
         let hasTop = chars.contains(where: { !($0.first?.isNumber == true || "!@#$%^&*()-_=+[]{}|;:'\",.<>/?~".contains($0.first ?? " ")) })
         let hasBottom = chars.contains(where: { $0.first?.isNumber == true || "!@#$%^&*()-_=+[]{}|;:'\",.<>/?~".contains($0.first ?? " ") })
         let isTwoRows = hasTop && hasBottom
 
-        let popupHeight: CGFloat = isTwoRows ? 82 : 46
+        let popupHeight: CGFloat = isTwoRows ? 78 : 44
         let colCount = isTwoRows ? max(1, chars.count - 1) : chars.count
         let popupWidth: CGFloat = min(bounds.width - 12, CGFloat(colCount) * 40 + 16)
 
-        var frame = CGRect(x: key.frame.midX - popupWidth / 2,
-                           y: key.frame.minY - popupHeight - 6,
+        // Convert key frame to targetParent coordinates
+        let keyFrameInTarget = key.convert(key.bounds, to: targetParent)
+
+        var popupY = keyFrameInTarget.minY - popupHeight - 4
+        // If top-row key popup extends beyond top of container, position it at topMargin
+        if popupY < 2 { popupY = 2 }
+
+        var frame = CGRect(x: keyFrameInTarget.midX - popupWidth / 2,
+                           y: popupY,
                            width: popupWidth, height: popupHeight)
-        // Keep inside keyboard bounds horizontally
+
         if frame.minX < 4 { frame.origin.x = 4 }
-        if frame.maxX > bounds.width - 4 { frame.origin.x = bounds.width - 4 - frame.width }
+        if frame.maxX > targetParent.bounds.width - 4 { frame.origin.x = targetParent.bounds.width - 4 - frame.width }
+
         popup.translatesAutoresizingMaskIntoConstraints = true
         popup.frame = frame
         self.popup = popup
@@ -194,10 +217,11 @@ final class KeyboardView: UIView {
         HapticManager.shared.tap()
     }
 
-    private func cancelPopup() {
+    func cancelPopup() {
         popup?.removeFromSuperview()
         popup = nil
         popupOwner = nil
+        didDragInPopup = false
     }
 
     // MARK: - Backspace repeat
@@ -225,6 +249,11 @@ extension KeyboardView: KeyButtonDelegate {
     func keyButton(_ button: KeyButton, didBegin touch: UITouch) {
         holdTimer?.invalidate()
 
+        // If a popup is open from another key, cancel it
+        if let popup = popup, popupOwner !== button {
+            cancelPopup()
+        }
+
         if button.definition.type == .backspace {
             startBackspaceRepeat()
             return
@@ -244,6 +273,7 @@ extension KeyboardView: KeyButtonDelegate {
 
     func keyButton(_ button: KeyButton, didMove touch: UITouch) {
         if let popup = popup, popupOwner === button {
+            didDragInPopup = true
             let p = touch.location(in: popup)
             popup.highlightIndex(forXInSelf: p.x)
         }
@@ -262,14 +292,23 @@ extension KeyboardView: KeyButtonDelegate {
         }
 
         if let popup = popup, popupOwner === button {
-            if !cancelled, let ch = popup.selectedCharacter {
-                delegate?.keyboardView(self, didHold: button.definition, resolved: ch)
+            if !cancelled {
+                // If user dragged finger inside popup, commit selected character & dismiss
+                if didDragInPopup, let ch = popup.selectedCharacter {
+                    delegate?.keyboardView(self, didHold: button.definition, resolved: ch)
+                    cancelPopup()
+                    return
+                }
+                // If user tapped & released without dragging, KEEP POPUP OPEN so user can tap an option!
+                return
             }
             cancelPopup()
             return
         }
 
         if !cancelled {
+            // Dismiss active popup if tapping another key
+            cancelPopup()
             delegate?.keyboardView(self, didTap: button.definition)
         }
     }

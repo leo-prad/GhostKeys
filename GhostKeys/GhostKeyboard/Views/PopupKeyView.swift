@@ -11,6 +11,8 @@ final class PopupKeyView: UIView {
     private(set) var highlightedIndex: Int = 0
     private var theme: KeyboardTheme
 
+    var onSelectCharacter: ((String) -> Void)?
+
     init(theme: KeyboardTheme) {
         self.theme = theme
         super.init(frame: .zero)
@@ -19,12 +21,13 @@ final class PopupKeyView: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     private func setup() {
+        isUserInteractionEnabled = true
         backgroundColor = theme.popupBackground
         layer.cornerRadius = 10
         layer.cornerCurve = .continuous
         layer.shadowColor = UIColor.black.cgColor
-        layer.shadowOpacity = 0.35
-        layer.shadowRadius = 8
+        layer.shadowOpacity = 0.40
+        layer.shadowRadius = 10
         layer.shadowOffset = CGSize(width: 0, height: 4)
 
         containerStack.axis = .vertical
@@ -102,6 +105,7 @@ final class PopupKeyView: UIView {
 
     private func createLabel(text: String) -> UILabel {
         let l = UILabel()
+        l.isUserInteractionEnabled = true
         l.text = text
         l.font = .systemFont(ofSize: 20, weight: .regular)
         l.textAlignment = .center
@@ -111,7 +115,15 @@ final class PopupKeyView: UIView {
         l.layer.masksToBounds = true
         l.translatesAutoresizingMaskIntoConstraints = false
         l.widthAnchor.constraint(greaterThanOrEqualToConstant: 34).isActive = true
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(labelTapped(_:)))
+        l.addGestureRecognizer(tap)
         return l
+    }
+
+    @objc private func labelTapped(_ sender: UITapGestureRecognizer) {
+        guard let l = sender.view as? UILabel, let text = l.text else { return }
+        onSelectCharacter?(text)
     }
 
     func highlightIndex(forXInSelf x: CGFloat) {
