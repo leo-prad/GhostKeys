@@ -11,6 +11,7 @@ final class KeyButton: UIView {
     weak var delegate: KeyButtonDelegate?
 
     let label = UILabel()
+    let hintLabel = UILabel()
     private var theme: KeyboardTheme
     private var isHighlighted = false { didSet { applyBackground() } }
 
@@ -48,12 +49,27 @@ final class KeyButton: UIView {
             label.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
 
+        // Top-right secondary character hint label (e.g., '1' on 'q', '3' on 'e', '@' on 'a')
+        if definition.type == .letter, let firstHold = definition.holdCharacters.first {
+            hintLabel.translatesAutoresizingMaskIntoConstraints = false
+            hintLabel.textAlignment = .right
+            hintLabel.font = .systemFont(ofSize: 10, weight: .bold)
+            hintLabel.textColor = theme.keyTextColor.withAlphaComponent(0.40)
+            hintLabel.text = firstHold
+            addSubview(hintLabel)
+            NSLayoutConstraint.activate([
+                hintLabel.topAnchor.constraint(equalTo: topAnchor, constant: 2),
+                hintLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -3)
+            ])
+        }
+
         applyBackground()
     }
 
     func apply(theme: KeyboardTheme) {
         self.theme = theme
         label.textColor = theme.keyTextColor
+        hintLabel.textColor = theme.keyTextColor.withAlphaComponent(0.40)
         layer.shadowColor = theme.keyShadowColor.cgColor
         applyBackground()
     }

@@ -30,7 +30,7 @@ final class PopupKeyView: UIView {
         stack.distribution = .fillEqually
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.isLayoutMarginsRelativeArrangement = true
-        stack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)
+        stack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4)
         addSubview(stack)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -47,7 +47,7 @@ final class PopupKeyView: UIView {
         for ch in characters {
             let l = UILabel()
             l.text = ch
-            l.font = .systemFont(ofSize: 22, weight: .regular)
+            l.font = .systemFont(ofSize: 21, weight: .regular)
             l.textAlignment = .center
             l.textColor = theme.keyTextColor
             l.backgroundColor = .clear
@@ -55,7 +55,6 @@ final class PopupKeyView: UIView {
             l.layer.masksToBounds = true
             l.translatesAutoresizingMaskIntoConstraints = false
             l.widthAnchor.constraint(greaterThanOrEqualToConstant: 36).isActive = true
-            l.heightAnchor.constraint(greaterThanOrEqualToConstant: 36).isActive = true
             stack.addArrangedSubview(l)
             labels.append(l)
         }

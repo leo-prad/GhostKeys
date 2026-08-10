@@ -15,6 +15,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.backgroundColor = .clear
 
         let theme = ThemeManager.theme(for: traitCollection.userInterfaceStyle)
 
@@ -233,13 +234,19 @@ extension KeyboardViewController: KeyboardViewDelegate {
             insert("\n")
 
         case .switchMode:
-            switch state.page {
-            case .letters:  state.page = .symbols1
-            case .symbols1: state.page = .symbols2
-            case .symbols2: state.page = .letters
+            if definition.primary == "ABC" {
+                state.page = .letters
+            } else if definition.primary == "#+=" {
+                state.page = .symbols2
+            } else if definition.primary == "123" {
+                state.page = .symbols1
+            } else {
+                switch state.page {
+                case .letters:  state.page = .symbols1
+                case .symbols1: state.page = .letters
+                case .symbols2: state.page = .letters
+                }
             }
-            // The switch key label for symbols pages is context-sensitive:
-            // "ABC" goes back to letters, "#+=" swaps between symbol pages.
             SoundManager.modifier()
             keyboardView.refreshForStateChange()
 

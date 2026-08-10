@@ -107,31 +107,21 @@ final class KeyboardView: UIView {
 
         let rowH = (h - topMargin - bottomMargin - vSpacing * CGFloat(rows.count - 1)) / CGFloat(rows.count)
 
-        // For the letters page: top row has 10 keys, all width 1.0
-        // Base key width is derived from a canonical 10-column row.
+        // Derive canonical key width from 10-column row
         let usableW = w - sideMargin * 2
         let baseW = (usableW - hSpacing * 9) / 10.0
 
         for (r, row) in rows.enumerated() {
             let y = topMargin + CGFloat(r) * (rowH + vSpacing)
-            // Compute total width for this row
-            var totalMul: CGFloat = 0
-            for k in row { totalMul += k.definition.widthMultiplier }
-            let totalSpacing = CGFloat(row.count - 1) * hSpacing
-            var rowWidth = totalMul * baseW + totalSpacing
 
-            // For the letters page middle row (9 keys), center it (like iOS)
-            var x: CGFloat = sideMargin + (usableW - rowWidth) / 2.0
-            // For rows containing a .space, stretch space to fill.
+            // For rows containing a .space, stretch space to fill available width.
             if let spaceIdx = row.firstIndex(where: { $0.definition.type == .space }) {
-                // Calculate available width minus the fixed keys
                 var fixed: CGFloat = 0
                 for (i, k) in row.enumerated() where i != spaceIdx {
                     fixed += k.definition.widthMultiplier * baseW
                 }
                 let spaceW = usableW - fixed - CGFloat(row.count - 1) * hSpacing
-                // Replace multiplier effect for layout:
-                x = sideMargin
+                var x = sideMargin
                 for (i, k) in row.enumerated() {
                     let keyW = (i == spaceIdx) ? spaceW : (k.definition.widthMultiplier * baseW)
                     k.frame = CGRect(x: x, y: y, width: keyW, height: rowH)
@@ -139,30 +129,47 @@ final class KeyboardView: UIView {
                 }
                 continue
             }
-            // Otherwise standard layout
-            x = sideMargin + (usableW - rowWidth) / 2.0
+
+            // For rows with side function keys (Row 3 of letters/symbols1/symbols2):
+            // Stretch the leftmost and rightmost keys to touch side margins cleanly.
+            let firstType = row.first?.definition.type
+            let lastType = row.last?.definition.type
+            let isSideKeyRow = (firstType == .shift || firstType == .switchMode) && lastType == .backspace
+
+            if isSideKeyRow && row.count > 2 {
+                let middleCount = row.count - 2
+                let totalSpacing = CGFloat(row.count - 1) * hSpacing
+                let sideKeyW = max(baseW * 1.2, (usableW - totalSpacing - CGFloat(middleCount) * baseW) / 2.0)
+
+                var x = sideMargin
+                for (i, k) in row.enumerated() {
+                    let keyW = (i == 0 || i == row.count - 1) ? sideKeyW : baseW
+                    k.frame = CGRect(x: x, y: y, width: keyW, height: rowH)
+                    x += keyW + hSpacing
+                }
+                continue
+            }
+
+            // Standard layout (10 keys or 9 keys centered)
+            var totalMul: CGFloat = 0
+            for k in row { totalMul += k.definition.widthMultiplier }
+            let totalSpacing = CGFloat(row.count - 1) * hSpacing
+            let rowWidth = totalMul * baseW + totalSpacing
+
+            var x = sideMargin + (usableW - rowWidth) / 2.0
             for k in row {
                 let keyW = k.definition.widthMultiplier * baseW
                 k.frame = CGRect(x: x, y: y, width: keyW, height: rowH)
                 x += keyW + hSpacing
             }
-            _ = rowWidth
         }
     }
 
     // MARK: - Popup helpers
     private func showPopup(for key: KeyButton) {
         cancelPopup()
-        var chars = key.definition.holdCharacters
-        // Include the primary if the shifted variant is different (accent picker style)
-        if key.definition.type == .letter, state.isShifted {
-            chars = chars.map { $0 }
-        }
-        // Prepend the base character so the user can commit to the original letter.
-        if key.definition.type == .letter {
-            chars.insert(state.isShifted ? key.definition.shifted : key.definition.primary, at: 0)
-        }
-        guard chars.count > 1 else { return }
+        let chars = key.definition.holdCharacters
+        guard !chars.isEmpty else { return }
 
         let popup = PopupKeyView(theme: theme)
         popup.configure(characters: chars)
