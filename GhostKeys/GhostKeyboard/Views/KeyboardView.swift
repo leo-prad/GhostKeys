@@ -83,7 +83,7 @@ final class KeyboardView: UIView {
                     // Set label per context (123 vs ABC vs #+=).
                     switch state.page {
                     case .letters:  k.displayString = "123"
-                    case .symbols1: k.displayString = k.definition.primary  // could be ABC or #+=
+                    case .symbols1: k.displayString = k.definition.primary  // ABC or #+=
                     case .symbols2: k.displayString = k.definition.primary
                     }
                 default:
@@ -100,10 +100,10 @@ final class KeyboardView: UIView {
         guard w > 0, h > 0, !rows.isEmpty else { return }
 
         let hSpacing: CGFloat = 6
-        let vSpacing: CGFloat = 8
+        let vSpacing: CGFloat = 6.5
         let sideMargin: CGFloat = 3
-        let topMargin: CGFloat = 4
-        let bottomMargin: CGFloat = 4
+        let topMargin: CGFloat = 3
+        let bottomMargin: CGFloat = 3
 
         let rowH = (h - topMargin - bottomMargin - vSpacing * CGFloat(rows.count - 1)) / CGFloat(rows.count)
 
@@ -130,16 +130,13 @@ final class KeyboardView: UIView {
                 continue
             }
 
-            // For rows with side function keys (Row 3 of letters/symbols1/symbols2):
-            // Stretch the leftmost and rightmost keys to touch side margins cleanly.
-            let firstType = row.first?.definition.type
-            let lastType = row.last?.definition.type
-            let isSideKeyRow = (firstType == .shift || firstType == .switchMode) && lastType == .backspace
+            // Row 3 of Letters page (shift + 7 letters + backspace): stretch shift and backspace to touch side margins
+            let isLettersRow3 = (r == 2 && state.page == .letters && row.first?.definition.type == .shift)
 
-            if isSideKeyRow && row.count > 2 {
+            if isLettersRow3 && row.count > 2 {
                 let middleCount = row.count - 2
                 let totalSpacing = CGFloat(row.count - 1) * hSpacing
-                let sideKeyW = max(baseW * 1.2, (usableW - totalSpacing - CGFloat(middleCount) * baseW) / 2.0)
+                let sideKeyW = (usableW - totalSpacing - CGFloat(middleCount) * baseW) / 2.0
 
                 var x = sideMargin
                 for (i, k) in row.enumerated() {
@@ -150,7 +147,7 @@ final class KeyboardView: UIView {
                 continue
             }
 
-            // Standard layout (10 keys or 9 keys centered)
+            // Standard layout (10 keys, 9 keys centered, or symbols row 3 centered with 1.35 multiplier for side keys)
             var totalMul: CGFloat = 0
             for k in row { totalMul += k.definition.widthMultiplier }
             let totalSpacing = CGFloat(row.count - 1) * hSpacing
@@ -172,11 +169,18 @@ final class KeyboardView: UIView {
         guard !chars.isEmpty else { return }
 
         let popup = PopupKeyView(theme: theme)
-        popup.configure(characters: chars)
+        popup.configure(holdCharacters: chars)
         popup.translatesAutoresizingMaskIntoConstraints = false
         addSubview(popup)
-        let popupHeight: CGFloat = 44
-        let popupWidth: CGFloat = min(bounds.width - 12, CGFloat(chars.count) * 44 + 12)
+
+        let hasTop = chars.contains(where: { !($0.first?.isNumber == true || "!@#$%^&*()-_=+[]{}|;:'\",.<>/?~".contains($0.first ?? " ")) })
+        let hasBottom = chars.contains(where: { $0.first?.isNumber == true || "!@#$%^&*()-_=+[]{}|;:'\",.<>/?~".contains($0.first ?? " ") })
+        let isTwoRows = hasTop && hasBottom
+
+        let popupHeight: CGFloat = isTwoRows ? 82 : 46
+        let colCount = isTwoRows ? max(1, chars.count - 1) : chars.count
+        let popupWidth: CGFloat = min(bounds.width - 12, CGFloat(colCount) * 40 + 16)
+
         var frame = CGRect(x: key.frame.midX - popupWidth / 2,
                            y: key.frame.minY - popupHeight - 6,
                            width: popupWidth, height: popupHeight)

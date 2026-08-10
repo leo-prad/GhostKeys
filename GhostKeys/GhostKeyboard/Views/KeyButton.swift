@@ -12,12 +12,16 @@ final class KeyButton: UIView {
 
     let label = UILabel()
     let hintLabel = UILabel()
+    let iconImageView = UIImageView()
+
     private var theme: KeyboardTheme
     private var isHighlighted = false { didSet { applyBackground() } }
 
     /// Displayed label for the current shift state.
     var displayString: String = "" {
-        didSet { label.text = displayString }
+        didSet {
+            updateContent()
+        }
     }
 
     init(definition: KeyDefinition, theme: KeyboardTheme) {
@@ -44,9 +48,17 @@ final class KeyButton: UIView {
         label.font = fontForKey()
         label.text = definition.primary
         addSubview(label)
+
+        iconImageView.translatesAutoresizingMaskIntoConstraints = false
+        iconImageView.contentMode = .center
+        iconImageView.tintColor = theme.keyTextColor
+        addSubview(iconImageView)
+
         NSLayoutConstraint.activate([
             label.centerXAnchor.constraint(equalTo: centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: centerYAnchor)
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+            iconImageView.centerXAnchor.constraint(equalTo: centerXAnchor),
+            iconImageView.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
 
         // Top-right secondary character hint label (e.g., '1' on 'q', '3' on 'e', '@' on 'a')
@@ -63,13 +75,40 @@ final class KeyButton: UIView {
             ])
         }
 
+        updateContent()
         applyBackground()
+    }
+
+    private func updateContent() {
+        switch definition.type {
+        case .shift:
+            label.isHidden = true
+            iconImageView.isHidden = false
+            let config = UIImage.SymbolConfiguration(pointSize: 19, weight: .semibold)
+            if displayString == "⇪" {
+                iconImageView.image = UIImage(systemName: "capslock.fill", withConfiguration: config)
+            } else if displayString == "⇧" {
+                iconImageView.image = UIImage(systemName: "shift.fill", withConfiguration: config)
+            } else {
+                iconImageView.image = UIImage(systemName: "shift", withConfiguration: config)
+            }
+        case .backspace:
+            label.isHidden = true
+            iconImageView.isHidden = false
+            let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
+            iconImageView.image = UIImage(systemName: "delete.left", withConfiguration: config)
+        default:
+            label.isHidden = false
+            iconImageView.isHidden = true
+            label.text = displayString
+        }
     }
 
     func apply(theme: KeyboardTheme) {
         self.theme = theme
         label.textColor = theme.keyTextColor
         hintLabel.textColor = theme.keyTextColor.withAlphaComponent(0.40)
+        iconImageView.tintColor = theme.keyTextColor
         layer.shadowColor = theme.keyShadowColor.cgColor
         applyBackground()
     }

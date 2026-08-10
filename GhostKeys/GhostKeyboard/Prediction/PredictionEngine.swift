@@ -115,12 +115,25 @@ final class PredictionEngine {
         return out
     }
 
+    static let profanityBlocklist: Set<String> = [
+        "ass", "shit", "fuck", "bitch", "cunt", "dick", "pussy", "bastard", "cock", "whore", "slut", "nigger", "faggot", "arse", "bollocks", "bugger", "wanker"
+    ]
+
     // MARK: - Prediction
 
     /// Return up to 3 candidate suggestions for the current caret position.
     /// `contextBefore` is the text before the caret (e.g. `documentContextBeforeInput`).
     /// `partial` is the word currently being typed (unfinished token, if any).
     func predict(contextBefore: String, partial: String? = nil) -> [PredictionResult] {
+        let trimmedBefore = contextBefore.trimmingCharacters(in: .whitespacesAndNewlines)
+        if (contextBefore.isEmpty || trimmedBefore.isEmpty) && (partial == nil || partial?.isEmpty == true) {
+            return [
+                PredictionResult(word: "I", score: 10.0),
+                PredictionResult(word: "The", score: 9.0),
+                PredictionResult(word: "And", score: 8.0)
+            ]
+        }
+
         var tokens = PredictionEngine.tokenize(contextBefore)
         var partialWord = partial?.lowercased() ?? ""
 
@@ -137,8 +150,10 @@ final class PredictionEngine {
         var scores: [String: Double] = [:]
 
         func add(_ w: String, base: Double, t: Double) {
-            if !partialWord.isEmpty && !w.hasPrefix(partialWord) { return }
-            if w == partialWord { return }
+            let lower = w.lowercased()
+            if partialWord.isEmpty && PredictionEngine.profanityBlocklist.contains(lower) { return }
+            if !partialWord.isEmpty && !lower.hasPrefix(partialWord) { return }
+            if lower == partialWord { return }
             scores[w, default: 0] += base * NGramStore.recencyBoost(t)
         }
 
