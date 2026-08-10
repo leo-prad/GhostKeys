@@ -170,9 +170,12 @@ final class PredictionEngine {
         }
         // Prefix completions from dictionary if user is typing.
         if !partialWord.isEmpty {
+            var count = 0
             for w in dict.orderedWords {
                 if w.hasPrefix(partialWord) && w != partialWord && scores[w] == nil {
                     scores[w] = 0.4 * NGramStore.recencyBoost(NGramStore.nowDays)
+                    count += 1
+                    if count >= 30 { break }
                 }
             }
         }
@@ -199,26 +202,30 @@ final class PredictionEngine {
             return preserveCasing(word, dup)
         }
 
-        // Rank candidates.
         struct Cand { let w: String; let score: Double }
         var ranked: [Cand] = []
-        var pool = Set(dict.orderedWords)
-        for k in store.accepted.keys { pool.insert(k) }
 
         let contextTokens = PredictionEngine.tokenize(contextBefore)
         let c2 = contextTokens.last
         let c1 = contextTokens.dropLast().last
 
-        for cand in pool {
-            if abs(cand.count - lw.count) > 2 { continue }
-            let d = damerau(lw, cand)
-            if d > 2 { continue }
-            if store.rejected[lw + PredictionEngine.sep + cand] != nil { continue }
+        let lwCount = lw.count
+        let lwChars = Array(lw)
+        guard let lwFirst = lwChars.first else { return nil }
 
-            let swapped: Bool = (lw.count == cand.count && d == 1 && {
-                let la = Array(lw), ca = Array(cand)
-                for i in 0..<(la.count - 1) {
-                    if la[i] == ca[i+1] && la[i+1] == ca[i] { return true }
+        func evaluateCandidate(_ cand: String) {
+            let candCount = cand.count
+            if abs(candCount - lwCount) > 2 { return }
+            let candChars = Array(cand)
+            if candChars.first != lwFirst && abs(candCount - lwCount) > 1 { return }
+            if store.rejected[lw + PredictionEngine.sep + cand] != nil { return }
+
+            let d = damerau(lwChars, candChars)
+            if d > 2 { return }
+
+            let swapped: Bool = (lwCount == candCount && d == 1 && {
+                for i in 0..<(lwChars.count - 1) {
+                    if lwChars[i] == candChars[i+1] && lwChars[i+1] == candChars[i] { return true }
                 }
                 return false
             }())
@@ -237,6 +244,14 @@ final class PredictionEngine {
             let score = frequency + personal + learnedTypo + ctx - Double(d) * 3.0 + (swapped ? 1.4 : 0) + bonus
             ranked.append(Cand(w: cand, score: score))
         }
+
+        for cand in dict.orderedWords {
+            evaluateCandidate(cand)
+        }
+        for cand in store.accepted.keys where dict.indexByWord[cand] == nil {
+            evaluateCandidate(cand)
+        }
+
         ranked.sort { $0.score > $1.score }
         guard let best = ranked.first else { return nil }
         let runnerUp = ranked.dropFirst().first
@@ -342,23 +357,29 @@ final class PredictionEngine {
     }
 
     /// Damerau-Levenshtein — recognises adjacent-swap typos (nto -> not = distance 1).
-    private func damerau(_ a: String, _ b: String) -> Int {
-        let m = a.count, n = b.count
+    private func damerau(_ ac: [Character], _ bc: [Character]) -> Int {
+        let m = ac.count, n = bc.count
         if abs(m - n) > 2 { return 3 }
-        let ac = Array(a), bc = Array(b)
-        var dp = Array(repeating: Array(repeating: 0, count: n + 1), count: m + 1)
-        for i in 0...m { dp[i][0] = i }
-        for j in 0...n { dp[0][j] = j }
+        var dp0 = Array(repeating: 0, count: n + 1)
+        var dp1 = Array(repeating: 0, count: n + 1)
+        var dp2 = Array(repeating: 0, count: n + 1)
+
+        for j in 0...n { dp1[j] = j }
+
         for i in 1...m {
+            dp2[0] = i
             for j in 1...n {
                 let cost = (ac[i-1] == bc[j-1]) ? 0 : 1
-                dp[i][j] = min(dp[i-1][j] + 1, dp[i][j-1] + 1, dp[i-1][j-1] + cost)
+                var val = min(dp1[j] + 1, dp2[j-1] + 1, dp1[j-1] + cost)
                 if i > 1, j > 1, ac[i-1] == bc[j-2], ac[i-2] == bc[j-1] {
-                    dp[i][j] = min(dp[i][j], dp[i-2][j-2] + 1)
+                    val = min(val, dp0[j-2] + 1)
                 }
+                dp2[j] = val
             }
+            dp0 = dp1
+            dp1 = dp2
         }
-        return dp[m][n]
+        return dp1[n]
     }
 
     /// Preserve leading capitalization from `typed` in the correction.
