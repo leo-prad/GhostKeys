@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDevelopmentRegion</key>
-    <string>en</string>
+    <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>GhostKeys</string>
+    <string>GhostKeyboard</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -22,10 +22,14 @@
     <string>1</string>
     <key>NSExtension</key>
     <dict>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.apple.keyboard-service</string>
+        <key>NSExtensionPrincipalClass</key>
+        <string>$(PRODUCT_MODULE_NAME).KeyboardViewController</string>
         <key>NSExtensionAttributes</key>
         <dict>
             <key>IsASCIICapable</key>
-            <true/>
+            <false/>
             <key>PrefersRightToLeft</key>
             <false/>
             <key>PrimaryLanguage</key>
@@ -33,10 +37,6 @@
             <key>RequestsOpenAccess</key>
             <true/>
         </dict>
-        <key>NSExtensionPointIdentifier</key>
-        <string>com.apple.keyboard-service</string>
-        <key>NSExtensionPrincipalClass</key>
-        <string>$(PRODUCT_MODULE_NAME).KeyboardViewController</string>
     </dict>
 </dict>
 </plist>

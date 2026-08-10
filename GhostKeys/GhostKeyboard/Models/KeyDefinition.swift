@@ -29,5 +29,5 @@ struct KeyDefinition {
     static let switch123 = KeyDefinition(primary: "123", shifted: "123", holdCharacters: [], widthMultiplier: 1.35, type: .switchMode)
     static let switchABC = KeyDefinition(primary: "ABC", shifted: "ABC", holdCharacters: [], widthMultiplier: 1.35, type: .switchMode)
     static let switchSym = KeyDefinition(primary: "#+=", shifted: "#+=", holdCharacters: [], widthMultiplier: 1.35, type: .switchMode)
-    static let globe     = KeyDefinition(primary: "🌐", shifted: "🌐", holdCharacters: [], widthMultiplier: 1.0, type: .nextKeyboard)
+    static let globe     = KeyDefinition(primary: "😀", shifted: "😀", holdCharacters: [], widthMultiplier: 1.0, type: .nextKeyboard)
 }

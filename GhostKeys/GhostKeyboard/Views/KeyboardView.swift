@@ -20,7 +20,9 @@ final class KeyboardView: UIView {
     private var popup: PopupKeyView?
     private var popupOwner: KeyButton?
     private var holdTimer: Timer?
-    private let holdThreshold: TimeInterval = 0.35
+    private var holdThreshold: TimeInterval {
+        return max(0.15, SharedDefaults.double(SharedDefaults.Key.holdDelayMs, default: 350) / 1000.0)
+    }
 
     // Backspace repeat
     private var backspaceTimer: Timer?
@@ -190,9 +192,10 @@ final class KeyboardView: UIView {
     // MARK: - Backspace repeat
     private func startBackspaceRepeat() {
         stopBackspaceRepeat()
+        let speed = max(0.02, SharedDefaults.double(SharedDefaults.Key.backspaceSpeedMs, default: 80) / 1000.0)
         backspaceTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
             guard let self = self else { return }
-            self.backspaceTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
+            self.backspaceTimer = Timer.scheduledTimer(withTimeInterval: speed, repeats: true) { [weak self] _ in
                 guard let self = self else { return }
                 self.delegate?.keyboardViewBackspaceRepeat(self)
             }

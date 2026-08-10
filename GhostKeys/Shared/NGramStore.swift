@@ -103,6 +103,26 @@ final class NGramStore {
         bump(&typos, t + NGramStore.sep + c); scheduleSave()
     }
 
+    func getLearnedWords() -> [String] {
+        let set = Set(uni.keys).union(accepted.keys)
+        return Array(set).sorted()
+    }
+
+    func addWord(_ word: String) {
+        let trimmed = word.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return }
+        bump(&uni, trimmed)
+        bump(&accepted, trimmed)
+        scheduleSave()
+    }
+
+    func removeWord(_ word: String) {
+        let lower = word.lowercased()
+        uni.removeValue(forKey: lower)
+        accepted.removeValue(forKey: lower)
+        scheduleSave()
+    }
+
     func clearAll() {
         uni = [:]; bi = [:]; tri = [:]; accepted = [:]; rejected = [:]; typos = [:]; keystrokes = 0
         scheduleSave()

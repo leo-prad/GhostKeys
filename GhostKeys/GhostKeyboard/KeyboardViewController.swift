@@ -72,6 +72,13 @@ final class KeyboardViewController: UIInputViewController {
     /// iOS-standard: when the field is empty or the previous character is a sentence terminator,
     /// automatically shift to uppercase (one-shot).
     private func updateShiftForContext() {
+        guard SharedDefaults.bool(SharedDefaults.Key.autoCapitalizationEnabled, default: true) else {
+            if state.shiftMode != .capsLock {
+                state.shiftMode = .lowercase
+                keyboardView.refreshForStateChange()
+            }
+            return
+        }
         guard state.shiftMode != .capsLock else { return }
         let before = textDocumentProxy.documentContextBeforeInput ?? ""
         let trimmed = before.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -127,10 +134,40 @@ final class KeyboardViewController: UIInputViewController {
 
     /// Insert `text`. Emits haptic + sound and re-computes suggestions.
     private func insert(_ text: String) {
+        if text == " ", SharedDefaults.bool(SharedDefaults.Key.doubleSpacePeriodEnabled, default: true) {
+            let before = textDocumentProxy.documentContextBeforeInput ?? ""
+            if before.hasSuffix(" ") && !before.hasSuffix(". ") {
+                textDocumentProxy.deleteBackward()
+                textDocumentProxy.insertText(". ")
+                engine.store.recordKeystroke()
+                if SharedDefaults.bool(SharedDefaults.Key.hapticsEnabled, default: true) { HapticManager.shared.tap() }
+                if SharedDefaults.bool(SharedDefaults.Key.soundEnabled, default: false) { SoundManager.tap() }
+                updateShiftForContext()
+                refreshSuggestions()
+                return
+            }
+        }
+
+        // Text replacement check on word completion
+        if text.count == 1, let ch = text.first, isWordTerminator(ch) {
+            let before = textDocumentProxy.documentContextBeforeInput ?? ""
+            var partial = ""
+            for c in before.reversed() {
+                if c.isLetter || c.isNumber { partial = String(c) + partial } else { break }
+            }
+            if !partial.isEmpty {
+                let replacements = SharedDefaults.getTextReplacements()
+                if let match = replacements.first(where: { $0.shortcut.lowercased() == partial.lowercased() }) {
+                    for _ in 0..<partial.count { textDocumentProxy.deleteBackward() }
+                    textDocumentProxy.insertText(match.phrase)
+                }
+            }
+        }
+
         textDocumentProxy.insertText(text)
         engine.store.recordKeystroke()
-        HapticManager.shared.tap()
-        SoundManager.tap()
+        if SharedDefaults.bool(SharedDefaults.Key.hapticsEnabled, default: true) { HapticManager.shared.tap() }
+        if SharedDefaults.bool(SharedDefaults.Key.soundEnabled, default: false) { SoundManager.tap() }
 
         // Word-commit — space/newline/punctuation completes a word for learning.
         if text.count == 1, let ch = text.first, isWordTerminator(ch) {
@@ -156,8 +193,8 @@ final class KeyboardViewController: UIInputViewController {
 
     private func deleteBackward() {
         textDocumentProxy.deleteBackward()
-        HapticManager.shared.delete()
-        SoundManager.delete()
+        if SharedDefaults.bool(SharedDefaults.Key.hapticsEnabled, default: true) { HapticManager.shared.delete() }
+        if SharedDefaults.bool(SharedDefaults.Key.soundEnabled, default: false) { SoundManager.delete() }
         updateShiftForContext()
         refreshSuggestions()
     }
