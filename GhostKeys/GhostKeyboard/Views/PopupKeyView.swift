@@ -111,7 +111,7 @@ final class PopupKeyView: UIView {
         l.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             l.widthAnchor.constraint(equalToConstant: 40),
-            l.heightAnchor.constraint(equalToConstant: 78)
+            l.heightAnchor.constraint(equalToConstant: 55)
         ])
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(labelTapped(_:)))

@@ -263,7 +263,7 @@ final class KeyboardView: UIView {
         let hasBottom = bottomCount > 0
         let isTwoRows = hasTop && hasBottom
 
-        let popupHeight: CGFloat = isTwoRows ? 171 : 90
+        let popupHeight: CGFloat = isTwoRows ? 125 : 67
         let colCount = max(1, max(topCount, bottomCount))
         let popupWidth: CGFloat = min(targetParent.bounds.width - 8,
                                       CGFloat(colCount) * 40 + CGFloat(max(0, colCount - 1)) * 3 + 12)
@@ -309,10 +309,13 @@ final class KeyboardView: UIView {
 
         let targetParent: UIView = superview ?? self
         let keyFrame = key.convert(key.bounds, to: targetParent)
-        let previewWidth = max(62, keyFrame.width + 28)
-        let previewTop = max(2, keyFrame.minY - keyFrame.height * 0.55)
-        let previewBottom = min(targetParent.bounds.maxY - 2,
-                                keyFrame.maxY + keyFrame.height * 0.95)
+        let previewWidth = max(52, keyFrame.width + 18)
+        let capHeight = max(52, keyFrame.height * 1.2)
+        let previewTop = max(2, keyFrame.minY - capHeight)
+        // The narrow stem occupies the pressed key itself. Previously the
+        // preview extended almost a full row below the key, making J appear to
+        // originate near B/N instead of directly above J.
+        let previewBottom = keyFrame.maxY
         var previewX = keyFrame.midX - previewWidth / 2
         previewX = max(3, min(previewX, targetParent.bounds.width - previewWidth - 3))
 
@@ -320,7 +323,7 @@ final class KeyboardView: UIView {
                                      theme: theme,
                                      stemWidth: keyFrame.width,
                                      stemCenterX: keyFrame.midX - previewX,
-                                     shoulderY: keyFrame.maxY - previewTop)
+                                     shoulderY: keyFrame.minY - previewTop - 9)
         preview.frame = CGRect(x: previewX, y: previewTop,
                                width: previewWidth, height: previewBottom - previewTop)
         targetParent.addSubview(preview)
