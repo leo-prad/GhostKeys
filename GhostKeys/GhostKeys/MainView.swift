@@ -10,6 +10,9 @@ struct MainView: View {
     @AppStorage(SharedDefaults.Key.autocorrectEnabled, store: SharedDefaults.store) private var autocorrect = true
     @AppStorage(SharedDefaults.Key.holdDelayMs, store: SharedDefaults.store) private var holdDelayMs = 350
     @AppStorage(SharedDefaults.Key.backspaceSpeedMs, store: SharedDefaults.store) private var backspaceSpeedMs = 80
+    @AppStorage(SharedDefaults.Key.doubleSpacePeriodMs, store: SharedDefaults.store) private var doubleSpacePeriodMs = 300
+    @AppStorage(SharedDefaults.Key.glideTriggerMs, store: SharedDefaults.store) private var glideTriggerMs = 80
+    @AppStorage(SharedDefaults.Key.deleteGlideWordEnabled, store: SharedDefaults.store) private var deleteGlideWord = true
 
     @State private var testText: String = ""
 
@@ -47,6 +50,7 @@ struct MainView: View {
                     Toggle("Special Character Haptics", isOn: $specialHaptics)
                     Toggle("“.” Shortcut", isOn: $doubleSpacePeriod)
                     Toggle("Autocorrect", isOn: $autocorrect)
+                    Toggle("Delete Glide Word with Backspace", isOn: $deleteGlideWord)
                 }
 
                 Section("Key Presses") {
@@ -64,6 +68,24 @@ struct MainView: View {
                             Text("Backspace Delete Speed")
                             Spacer()
                             Text("\(backspaceSpeedMs) ms")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Stepper(value: $glideTriggerMs, in: 0...500, step: 25) {
+                        HStack {
+                            Text("Glide Typing Trigger")
+                            Spacer()
+                            Text("\(glideTriggerMs) ms")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Stepper(value: $doubleSpacePeriodMs, in: 100...1000, step: 25) {
+                        HStack {
+                            Text("Double-Space Period Window")
+                            Spacer()
+                            Text("\(doubleSpacePeriodMs) ms")
                                 .foregroundStyle(.secondary)
                         }
                     }

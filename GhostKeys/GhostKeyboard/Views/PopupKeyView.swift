@@ -32,11 +32,13 @@ final class PopupKeyView: UIView {
 
         containerStack.axis = .vertical
         containerStack.spacing = 3
-        containerStack.alignment = .center
+        // Trailing alignment makes a short number/symbol row hug the popup's
+        // right edge, matching the reference layout.
+        containerStack.alignment = .trailing
         containerStack.distribution = .fill
         containerStack.translatesAutoresizingMaskIntoConstraints = false
         containerStack.isLayoutMarginsRelativeArrangement = true
-        containerStack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4)
+        containerStack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)
         addSubview(containerStack)
 
         topStack.axis = .horizontal
@@ -66,26 +68,10 @@ final class PopupKeyView: UIView {
         topStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         bottomStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
-        var primaryHold: String? = nil
-        var accentLetters: [String] = []
-
-        for ch in holdCharacters {
-            if primaryHold == nil, let f = ch.first, f.isNumber || "!@#$%^&*()-_=+[]{}|;:'\",.<>/?~".contains(f) {
-                primaryHold = ch
-            } else {
-                accentLetters.append(ch)
-            }
-        }
+        let accentLetters = holdCharacters.filter { $0.first?.isLetter == true }
+        let symbols = holdCharacters.filter { $0.first?.isLetter != true }
 
         var sequence: [String] = []
-
-        // If there's a primary number/symbol (e.g. '3' or '@'), place it on the bottom row
-        if let primary = primaryHold {
-            let l = createLabel(text: primary)
-            bottomStack.addArrangedSubview(l)
-            labelViews.append(l)
-            sequence.append(primary)
-        }
 
         // Accent letters (e.g. è, é, ê, ë, ē) go on top row
         for ch in accentLetters {
@@ -95,11 +81,20 @@ final class PopupKeyView: UIView {
             sequence.append(ch)
         }
 
+        // All number/symbol alternatives share the bottom row. This matters on
+        // the symbol pages where a key can expose several currency or quote marks.
+        for ch in symbols {
+            let l = createLabel(text: ch)
+            bottomStack.addArrangedSubview(l)
+            labelViews.append(l)
+            sequence.append(ch)
+        }
+
         self.characterSequence = sequence
         topStack.isHidden = accentLetters.isEmpty
-        bottomStack.isHidden = (primaryHold == nil)
+        bottomStack.isHidden = symbols.isEmpty
 
-        highlightedIndex = 0
+        highlightedIndex = symbols.isEmpty ? 0 : accentLetters.count
         updateHighlight()
     }
 
@@ -114,7 +109,10 @@ final class PopupKeyView: UIView {
         l.layer.cornerRadius = 6
         l.layer.masksToBounds = true
         l.translatesAutoresizingMaskIntoConstraints = false
-        l.widthAnchor.constraint(greaterThanOrEqualToConstant: 34).isActive = true
+        NSLayoutConstraint.activate([
+            l.widthAnchor.constraint(equalToConstant: 40),
+            l.heightAnchor.constraint(equalToConstant: 78)
+        ])
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(labelTapped(_:)))
         l.addGestureRecognizer(tap)
@@ -126,15 +124,22 @@ final class PopupKeyView: UIView {
         onSelectCharacter?(text)
     }
 
-    func highlightIndex(forXInSelf x: CGFloat) {
+    /// Highlights the alternate nearest to the finger. Using both axes is
+    /// important because number/symbol alternates live below accent letters.
+    func highlightCharacter(at point: CGPoint) {
         guard !labelViews.isEmpty else { return }
-        let width = bounds.width
-        guard width > 0 else { return }
-        let idx = max(0, min(labelViews.count - 1, Int(x / (width / CGFloat(labelViews.count)))))
+        layoutIfNeeded()
+
+        let idx = labelViews.enumerated().min { lhs, rhs in
+            let lhsCenter = lhs.element.convert(lhs.element.bounds, to: self).center
+            let rhsCenter = rhs.element.convert(rhs.element.bounds, to: self).center
+            return lhsCenter.distanceSquared(to: point) < rhsCenter.distanceSquared(to: point)
+        }?.offset ?? highlightedIndex
+
         if idx != highlightedIndex {
             highlightedIndex = idx
             updateHighlight()
-            HapticManager.shared.tap()
+            HapticManager.shared.specialSelection()
         }
     }
 
@@ -153,5 +158,17 @@ final class PopupKeyView: UIView {
                 l.textColor = theme.keyTextColor
             }
         }
+    }
+}
+
+private extension CGRect {
+    var center: CGPoint { CGPoint(x: midX, y: midY) }
+}
+
+private extension CGPoint {
+    func distanceSquared(to other: CGPoint) -> CGFloat {
+        let dx = x - other.x
+        let dy = y - other.y
+        return dx * dx + dy * dy
     }
 }

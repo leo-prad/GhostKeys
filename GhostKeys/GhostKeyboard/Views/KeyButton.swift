@@ -63,18 +63,14 @@ final class KeyButton: UIView {
 
         // Top-right secondary character hint label (e.g., '1' on 'q', '3' on 'e', '@' on 'a')
         if definition.type == .letter, let firstHold = definition.holdCharacters.first {
-            hintLabel.translatesAutoresizingMaskIntoConstraints = false
+            hintLabel.translatesAutoresizingMaskIntoConstraints = true
             hintLabel.textAlignment = .right
-            hintLabel.font = .systemFont(ofSize: 10, weight: .semibold)
+            hintLabel.font = .systemFont(ofSize: 11, weight: .regular)
             hintLabel.textColor = theme.keyTextColor.withAlphaComponent(0.45)
             hintLabel.text = firstHold
+            hintLabel.numberOfLines = 1
+            hintLabel.adjustsFontSizeToFitWidth = false
             addSubview(hintLabel)
-            NSLayoutConstraint.activate([
-                hintLabel.topAnchor.constraint(equalTo: topAnchor, constant: 3),
-                hintLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -5),
-                hintLabel.widthAnchor.constraint(equalToConstant: 14),
-                hintLabel.heightAnchor.constraint(equalToConstant: 12)
-            ])
         }
 
         updateContent()
@@ -135,6 +131,24 @@ final class KeyButton: UIView {
             base = theme.specialKeyBackground
         }
         backgroundColor = isHighlighted ? theme.keyHighlightColor : base
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard !hintLabel.isHidden, hintLabel.text != nil else { return }
+        let size = hintLabel.sizeThatFits(CGSize(width: bounds.width - 8, height: 16))
+        let width = max(16, ceil(size.width))
+        // Pin the natural-size glyph box to the top-right. Avoiding a short
+        // fixed-height Auto Layout box prevents vertical glyph compression.
+        hintLabel.frame = CGRect(x: bounds.width - width - 4, y: 1,
+                                 width: width, height: 16)
+    }
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        if definition.type == .backspace {
+            return bounds.insetBy(dx: -10, dy: -6).contains(point)
+        }
+        return super.point(inside: point, with: event)
     }
 
     // MARK: - Touch handling

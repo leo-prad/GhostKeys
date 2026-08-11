@@ -5,10 +5,11 @@ protocol SuggestionBarDelegate: AnyObject {
 }
 
 final class SuggestionItemView: UIView {
+    private let highlightView = UIView()
     private let label = UILabel()
     private var isHighlighted = false {
         didSet {
-            backgroundColor = isHighlighted ? UIColor.white.withAlphaComponent(0.12) : .clear
+            highlightView.isHidden = !isHighlighted
         }
     }
 
@@ -25,18 +26,32 @@ final class SuggestionItemView: UIView {
 
     private func setup() {
         isUserInteractionEnabled = true
+        highlightView.isUserInteractionEnabled = false
+        highlightView.isHidden = true
+        highlightView.backgroundColor = UIColor.white.withAlphaComponent(0.12)
+        highlightView.layer.cornerRadius = 15
+        highlightView.layer.cornerCurve = .continuous
+        highlightView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(highlightView)
+
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
-            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
-            label.topAnchor.constraint(equalTo: topAnchor),
-            label.bottomAnchor.constraint(equalTo: bottomAnchor)
+            label.centerXAnchor.constraint(equalTo: centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -2),
+            label.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 8),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8),
+
+            highlightView.leadingAnchor.constraint(equalTo: label.leadingAnchor, constant: -12),
+            highlightView.trailingAnchor.constraint(equalTo: label.trailingAnchor, constant: 12),
+            highlightView.centerYAnchor.constraint(equalTo: label.centerYAnchor),
+            highlightView.heightAnchor.constraint(equalToConstant: 30)
         ])
     }
 
     func configure(text: String, isAutocorrect: Bool, textColor: UIColor) {
+        isHighlighted = false
         self.text = text
         self.isAutocorrect = isAutocorrect
         if isAutocorrect {
