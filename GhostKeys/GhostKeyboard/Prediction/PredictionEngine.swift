@@ -48,7 +48,8 @@ final class PredictionEngine {
 
     // Common English contractions & shortcuts. Autocorrect fires these first.
     static let contractions: [String: String] = [
-        "lets": "let's", "im": "I'm", "dont": "don't", "cant": "can't", "wont": "won't",
+        "lets": "let's", "im": "I'm", "dont": "don't", "doesnt": "doesn't",
+        "didnt": "didn't", "cant": "can't", "wont": "won't",
         "isnt": "isn't", "arent": "aren't", "wasnt": "wasn't", "werent": "weren't",
         "hasnt": "hasn't", "havent": "haven't", "hadnt": "hadn't", "couldnt": "couldn't",
         "wouldnt": "wouldn't", "shouldnt": "shouldn't", "youre": "you're", "theyre": "they're",
@@ -288,6 +289,10 @@ final class PredictionEngine {
         func evaluateCandidate(_ cand: String) {
             let candCount = cand.count
             if abs(candCount - lwCount) > 2 { return }
+            // Reject candidates that are strict prefixes of the typed word (e.g.
+            // "doesnt" → "doesn"). Users almost never typo by appending garbage,
+            // so this class of "correction" is almost always a regression.
+            if candCount < lwCount && lw.hasPrefix(cand) { return }
             let candChars = Array(cand)
             if candChars.first != lwFirst && abs(candCount - lwCount) > 1 { return }
             if store.rejected[lw + PredictionEngine.sep + cand] != nil { return }

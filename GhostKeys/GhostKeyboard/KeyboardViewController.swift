@@ -138,6 +138,9 @@ final class KeyboardViewController: UIInputViewController {
             }
         }
         while strings.count < 3 { strings.append("") }
+        if state.shiftMode == .capsLock {
+            strings = strings.map { $0.uppercased() }
+        }
         suggestionBar.setSuggestions(strings, autocorrectIndex: autoIndex)
     }
 
@@ -183,7 +186,8 @@ final class KeyboardViewController: UIInputViewController {
                 let replacements = SharedDefaults.getTextReplacements()
                 if let match = replacements.first(where: { $0.shortcut.lowercased() == partial.lowercased() }) {
                     for _ in 0..<partial.count { textDocumentProxy.deleteBackward() }
-                    textDocumentProxy.insertText(match.phrase)
+                    let phrase = caseMatched(replacement: match.phrase, typed: partial)
+                    textDocumentProxy.insertText(phrase)
                 } else if SharedDefaults.bool(SharedDefaults.Key.autocorrectEnabled, default: true),
                           let corrected = engine.autocorrect(partial, contextBefore: String(before.dropLast(partial.count))),
                           corrected != partial {
@@ -206,6 +210,28 @@ final class KeyboardViewController: UIInputViewController {
         }
         updateShiftForContext()
         refreshSuggestions()
+    }
+
+    /// Adjust a text-replacement phrase's casing to match how the shortcut was typed.
+    /// - Shortcut all-caps (e.g. "BRB")  → phrase upper-cased ("BE RIGHT BACK!")
+    /// - Shortcut Title-cased ("Brb")    → phrase's first letter capitalized
+    /// - Otherwise                        → phrase unchanged
+    /// Only active when caseMatchReplacementsEnabled is set.
+    private func caseMatched(replacement phrase: String, typed: String) -> String {
+        guard SharedDefaults.bool(SharedDefaults.Key.caseMatchReplacementsEnabled, default: false) else {
+            return phrase
+        }
+        let letters = typed.filter { $0.isLetter }
+        guard letters.count > 1 else { return phrase }
+        if letters == letters.uppercased() && letters != letters.lowercased() {
+            return phrase.uppercased()
+        }
+        if let first = letters.first, first.isUppercase,
+           letters.dropFirst().allSatisfy({ $0.isLowercase }) {
+            guard let firstPhrase = phrase.first else { return phrase }
+            return firstPhrase.uppercased() + phrase.dropFirst()
+        }
+        return phrase
     }
 
     private func isWordTerminator(_ ch: Character) -> Bool {
@@ -344,6 +370,11 @@ extension KeyboardViewController: KeyboardViewDelegate {
             pendingGlideSeparator = false
             lastGlideWord = nil
             insert(" ")
+            // iOS-standard: tapping space on the symbol pages returns to letters.
+            if state.page != .letters {
+                state.page = .letters
+                keyboardView.refreshForStateChange()
+            }
 
         case .returnKey:
             pendingGlideSeparator = false
@@ -392,9 +423,14 @@ extension KeyboardViewController: KeyboardViewDelegate {
             }
             return
         }
-        let word = state.isShifted
-            ? decoded.prefix(1).uppercased() + decoded.dropFirst()
-            : decoded
+        let word: String
+        if state.shiftMode == .capsLock {
+            word = decoded.uppercased()
+        } else if state.isShifted {
+            word = decoded.prefix(1).uppercased() + decoded.dropFirst()
+        } else {
+            word = decoded
+        }
         if pendingGlideSeparator { insert(" ") }
         pendingGlideSeparator = false
         insert(word)
@@ -419,6 +455,24 @@ extension KeyboardViewController: KeyboardViewDelegate {
         // The globe key long-press behaviour is handled by the system when
         // handleInputModeList(from:with:) is called on a UITouchEvent. For tap,
         // we cycle to the next mode in didTap.
+    }
+
+    // MARK: - Hold-space cursor drag
+
+    func keyboardViewSpaceCursorBegan(_ view: KeyboardView) {
+        // Any pending glide state is stale once the user is scrubbing the caret.
+        pendingGlideSeparator = false
+        lastGlideWord = nil
+    }
+
+    func keyboardViewSpaceCursorMove(_ view: KeyboardView, characterOffset: Int) {
+        guard characterOffset != 0 else { return }
+        textDocumentProxy.adjustTextPosition(byCharacterOffset: characterOffset)
+    }
+
+    func keyboardViewSpaceCursorEnded(_ view: KeyboardView) {
+        updateShiftForContext()
+        refreshSuggestions()
     }
 }
 

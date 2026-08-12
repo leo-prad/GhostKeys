@@ -25,6 +25,7 @@ enum SharedDefaults {
         static let learnedWords = "learnedWords"
         static let totalKeystrokes = "totalKeystrokes"
         static let textReplacements = "textReplacements"
+        static let caseMatchReplacementsEnabled = "caseMatchReplacementsEnabled"
     }
 
     static func bool(_ key: String, default def: Bool) -> Bool {

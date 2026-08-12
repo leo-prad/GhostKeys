@@ -13,6 +13,7 @@ struct MainView: View {
     @AppStorage(SharedDefaults.Key.doubleSpacePeriodMs, store: SharedDefaults.store) private var doubleSpacePeriodMs = 300
     @AppStorage(SharedDefaults.Key.glideTriggerMs, store: SharedDefaults.store) private var glideTriggerMs = 80
     @AppStorage(SharedDefaults.Key.deleteGlideWordEnabled, store: SharedDefaults.store) private var deleteGlideWord = true
+    @AppStorage(SharedDefaults.Key.caseMatchReplacementsEnabled, store: SharedDefaults.store) private var caseMatchReplacements = false
 
     @State private var testText: String = ""
 
@@ -51,6 +52,7 @@ struct MainView: View {
                     Toggle("“.” Shortcut", isOn: $doubleSpacePeriod)
                     Toggle("Autocorrect", isOn: $autocorrect)
                     Toggle("Delete Glide Word with Backspace", isOn: $deleteGlideWord)
+                    Toggle("Match Case in Text Replacement", isOn: $caseMatchReplacements)
                 }
 
                 Section("Key Presses") {

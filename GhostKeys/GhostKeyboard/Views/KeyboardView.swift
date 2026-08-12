@@ -7,6 +7,10 @@ protocol KeyboardViewDelegate: AnyObject {
     func keyboardViewBackspaceRepeat(_ view: KeyboardView)
     func keyboardView(_ view: KeyboardView, deleteWords count: Int)
     func keyboardViewNextKeyboardEvent(_ view: KeyboardView, sender: UIView, event: UIEvent?)
+    /// Hold-space cursor drag lifecycle.
+    func keyboardViewSpaceCursorBegan(_ view: KeyboardView)
+    func keyboardViewSpaceCursorMove(_ view: KeyboardView, characterOffset: Int)
+    func keyboardViewSpaceCursorEnded(_ view: KeyboardView)
 }
 
 /// Main keyboard container. Lays out rows for the current page.
@@ -38,6 +42,12 @@ final class KeyboardView: UIView {
     private var glidePoints: [CGPoint] = []
     private let glideLayer = CAShapeLayer()
     private var backspaceSwipeWords = 0
+
+    // Hold-space cursor drag
+    private var spaceHoldTimer: Timer?
+    private var spaceCursorMode = false
+    private var spaceCursorLastX: CGFloat = 0
+    private static let spaceCursorPointsPerChar: CGFloat = 9
 
     init(state: KeyboardState, theme: KeyboardTheme) {
         self.state = state
@@ -339,13 +349,17 @@ final class KeyboardView: UIView {
     private func startBackspaceRepeat() {
         stopBackspaceRepeat()
         let speed = max(0.02, SharedDefaults.double(SharedDefaults.Key.backspaceSpeedMs, default: 80) / 1000.0)
-        backspaceTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
+        let initial = Timer(timeInterval: 0.35, repeats: false) { [weak self] _ in
             guard let self = self else { return }
-            self.backspaceTimer = Timer.scheduledTimer(withTimeInterval: speed, repeats: true) { [weak self] _ in
+            let repeating = Timer(timeInterval: speed, repeats: true) { [weak self] _ in
                 guard let self = self else { return }
                 self.delegate?.keyboardViewBackspaceRepeat(self)
             }
+            RunLoop.main.add(repeating, forMode: .common)
+            self.backspaceTimer = repeating
         }
+        RunLoop.main.add(initial, forMode: .common)
+        backspaceTimer = initial
     }
 
     private func stopBackspaceRepeat() {
@@ -407,6 +421,9 @@ final class KeyboardView: UIView {
 extension KeyboardView: KeyButtonDelegate {
     func keyButton(_ button: KeyButton, didBegin touch: UITouch) {
         holdTimer?.invalidate()
+        spaceHoldTimer?.invalidate()
+        spaceHoldTimer = nil
+        spaceCursorMode = false
         touchStart = touch.location(in: self)
         touchStartTimestamp = touch.timestamp
         lastTouchPoint = touchStart
@@ -439,11 +456,32 @@ extension KeyboardView: KeyButtonDelegate {
             return
         }
 
+        if button.definition.type == .space {
+            // Long-press on space enters iOS-style cursor-drag mode: after a
+            // short hold, horizontal finger motion moves the caret instead of
+            // inserting a space on lift.
+            spaceCursorLastX = touchStart.x
+            let t = Timer(timeInterval: max(0.28, holdThreshold), repeats: false) { [weak self] _ in
+                guard let self = self else { return }
+                self.spaceCursorMode = true
+                self.delegate?.keyboardViewSpaceCursorBegan(self)
+                HapticManager.shared.special()
+            }
+            RunLoop.main.add(t, forMode: .common)
+            spaceHoldTimer = t
+        }
+
         if !button.definition.holdCharacters.isEmpty {
-            holdTimer = Timer.scheduledTimer(withTimeInterval: holdThreshold, repeats: false) { [weak self, weak button] _ in
+            // Schedule on .common modes so the timer fires uniformly across all
+            // keys — otherwise edge keys need a much longer hold because the
+            // runloop stays in .tracking mode during finger micro-motion and
+            // .default-mode timers never fire until touchesEnded.
+            let t = Timer(timeInterval: holdThreshold, repeats: false) { [weak self, weak button] _ in
                 guard let self = self, let button = button else { return }
                 self.showPopup(for: button)
             }
+            RunLoop.main.add(t, forMode: .common)
+            holdTimer = t
         }
     }
 
@@ -454,6 +492,21 @@ extension KeyboardView: KeyButtonDelegate {
 
         if glideDistance > 6 {
             hideKeyPreview()
+        }
+
+        // Hold-space cursor drag: while the mode is active, translate horizontal
+        // finger motion into character offsets and eat the event so it isn't
+        // also interpreted as anything else.
+        if button.definition.type == .space, spaceCursorMode {
+            let dx = point.x - spaceCursorLastX
+            let step = KeyboardView.spaceCursorPointsPerChar
+            let n = Int((dx / step).rounded(.towardZero))
+            if n != 0 {
+                delegate?.keyboardViewSpaceCursorMove(self, characterOffset: n)
+                spaceCursorLastX += CGFloat(n) * step
+            }
+            lastTouchPoint = point
+            return
         }
 
         if button.definition.type == .backspace {
@@ -495,6 +548,19 @@ extension KeyboardView: KeyButtonDelegate {
         holdTimer?.invalidate()
         holdTimer = nil
         hideKeyPreview()
+
+        // End any active space cursor drag. If we were in cursor mode, do NOT
+        // fall through to the tap path — the user was moving the caret, not
+        // inserting a space.
+        if button.definition.type == .space {
+            spaceHoldTimer?.invalidate()
+            spaceHoldTimer = nil
+            if spaceCursorMode {
+                spaceCursorMode = false
+                delegate?.keyboardViewSpaceCursorEnded(self)
+                return
+            }
+        }
 
         if button.definition.type == .backspace {
             stopBackspaceRepeat()
