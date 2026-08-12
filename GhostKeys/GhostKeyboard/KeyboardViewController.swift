@@ -10,12 +10,17 @@ final class KeyboardViewController: UIInputViewController {
     private var lastCommittedWord: String? // for revert-after-autocorrect
     private var pendingAutocorrectTyped: String? // the typo that was replaced
     private var pendingAutocorrectCorrected: String?
+    private var pendingGlideSeparator = false
+    private var lastGlideWord: String?
+    private var lastSpaceTap: TimeInterval?
+    private var contextRefreshWorkItem: DispatchWorkItem?
 
     // MARK: - Life-cycle
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
+        view.clipsToBounds = false
 
         let theme = ThemeManager.theme(for: traitCollection.userInterfaceStyle)
 
@@ -33,7 +38,7 @@ final class KeyboardViewController: UIInputViewController {
             suggestionBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             suggestionBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             suggestionBar.topAnchor.constraint(equalTo: view.topAnchor),
-            suggestionBar.heightAnchor.constraint(equalToConstant: 44),
+            suggestionBar.heightAnchor.constraint(equalToConstant: 36),
 
             keyboardView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             keyboardView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -42,7 +47,7 @@ final class KeyboardViewController: UIInputViewController {
         ])
 
         // Total keyboard height (letter portion + suggestion bar).
-        heightConstraint = view.heightAnchor.constraint(equalToConstant: 260)
+        heightConstraint = view.heightAnchor.constraint(equalToConstant: 244)
         heightConstraint.priority = .required - 1
         heightConstraint.isActive = true
 
@@ -52,6 +57,8 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        // Pull the latest host-app settings when iOS reactivates the extension.
+        SharedDefaults.store.synchronize()
         updateShiftForContext()
     }
 
@@ -100,7 +107,10 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - Suggestions
 
     private func refreshSuggestions() {
-        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let actualBefore = textDocumentProxy.documentContextBeforeInput ?? ""
+        // A glide word keeps a virtual trailing space until the next input so
+        // punctuation can attach cleanly while suggestions remain next-word suggestions.
+        let before = pendingGlideSeparator ? actualBefore + " " : actualBefore
         // Partial word = trailing letters not followed by whitespace.
         var partial = ""
         for ch in before.reversed() {
@@ -135,11 +145,21 @@ final class KeyboardViewController: UIInputViewController {
 
     /// Insert `text`. Emits haptic + sound and re-computes suggestions.
     private func insert(_ text: String) {
-        if text == " ", SharedDefaults.bool(SharedDefaults.Key.doubleSpacePeriodEnabled, default: true) {
+        if text == " " {
+            let now = ProcessInfo.processInfo.systemUptime
             let before = textDocumentProxy.documentContextBeforeInput ?? ""
-            if before.hasSuffix(" ") && !before.hasSuffix(". ") {
+            let window = SharedDefaults.double(SharedDefaults.Key.doubleSpacePeriodMs, default: 300) / 1000
+            let precedingFirstSpace = before.dropLast().last
+            let isTimedSecondSpace = lastSpaceTap.map { now - $0 <= window } ?? false
+
+            if SharedDefaults.bool(SharedDefaults.Key.doubleSpacePeriodEnabled, default: true),
+               isTimedSecondSpace,
+               before.last == " ",
+               let precedingFirstSpace,
+               !precedingFirstSpace.isWhitespace {
                 textDocumentProxy.deleteBackward()
                 textDocumentProxy.insertText(". ")
+                lastSpaceTap = nil
                 engine.store.recordKeystroke()
                 if SharedDefaults.bool(SharedDefaults.Key.hapticsEnabled, default: true) { HapticManager.shared.tap() }
                 if SharedDefaults.bool(SharedDefaults.Key.soundEnabled, default: false) { SoundManager.tap() }
@@ -147,9 +167,12 @@ final class KeyboardViewController: UIInputViewController {
                 refreshSuggestions()
                 return
             }
+            lastSpaceTap = now
+        } else {
+            lastSpaceTap = nil
         }
 
-        // Text replacement check on word completion
+        // Text replacement and autocorrect checks on word completion.
         if text.count == 1, let ch = text.first, isWordTerminator(ch) {
             let before = textDocumentProxy.documentContextBeforeInput ?? ""
             var partial = ""
@@ -161,6 +184,13 @@ final class KeyboardViewController: UIInputViewController {
                 if let match = replacements.first(where: { $0.shortcut.lowercased() == partial.lowercased() }) {
                     for _ in 0..<partial.count { textDocumentProxy.deleteBackward() }
                     textDocumentProxy.insertText(match.phrase)
+                } else if SharedDefaults.bool(SharedDefaults.Key.autocorrectEnabled, default: true),
+                          let corrected = engine.autocorrect(partial, contextBefore: String(before.dropLast(partial.count))),
+                          corrected != partial {
+                    for _ in 0..<partial.count { textDocumentProxy.deleteBackward() }
+                    textDocumentProxy.insertText(corrected)
+                    pendingAutocorrectTyped = partial
+                    pendingAutocorrectCorrected = corrected
                 }
             }
         }
@@ -196,8 +226,81 @@ final class KeyboardViewController: UIInputViewController {
         textDocumentProxy.deleteBackward()
         if SharedDefaults.bool(SharedDefaults.Key.hapticsEnabled, default: true) { HapticManager.shared.delete() }
         if SharedDefaults.bool(SharedDefaults.Key.soundEnabled, default: false) { SoundManager.delete() }
-        updateShiftForContext()
-        refreshSuggestions()
+        scheduleContextRefresh()
+    }
+
+    private func scheduleContextRefresh() {
+        contextRefreshWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            self?.updateShiftForContext()
+            self?.refreshSuggestions()
+        }
+        contextRefreshWorkItem = work
+        DispatchQueue.main.async(execute: work)
+    }
+
+    private func deleteLastGlideWordIfNeeded() -> Bool {
+        guard pendingGlideSeparator,
+              SharedDefaults.bool(SharedDefaults.Key.deleteGlideWordEnabled, default: true),
+              let word = lastGlideWord,
+              (textDocumentProxy.documentContextBeforeInput ?? "").hasSuffix(word) else { return false }
+
+        for _ in word { textDocumentProxy.deleteBackward() }
+        HapticManager.shared.delete()
+        SoundManager.delete()
+        pendingGlideSeparator = false
+        lastGlideWord = nil
+        scheduleContextRefresh()
+        return true
+    }
+
+    private func deletePreviousWords(_ count: Int) {
+        guard count > 0 else { return }
+        let before = textDocumentProxy.documentContextBeforeInput ?? ""
+        let characters = Array(before)
+        var index = characters.count
+        var words = 0
+
+        while index > 0, words < count {
+            while index > 0, characters[index - 1].isWhitespace { index -= 1 }
+            guard index > 0 else { break }
+            while index > 0, !characters[index - 1].isWhitespace { index -= 1 }
+            words += 1
+        }
+
+        let deleteCount = characters.count - index
+        guard deleteCount > 0 else { return }
+        for _ in 0..<deleteCount { textDocumentProxy.deleteBackward() }
+        HapticManager.shared.delete()
+        SoundManager.delete()
+        scheduleContextRefresh()
+    }
+
+    private func isAttachedPunctuation(_ text: String) -> Bool {
+        guard text.count == 1, let character = text.first else { return false }
+        return ".,!?;:%)]}\"…¿¡".contains(character)
+    }
+
+    private func isWordJoiner(_ text: String) -> Bool {
+        guard text.count == 1, let character = text.first else { return false }
+        return "'’‘-–—".contains(character)
+    }
+
+    private func prepareForManualCharacter(_ text: String) {
+        guard pendingGlideSeparator else { return }
+        if isAttachedPunctuation(text) {
+            // Terminal punctuation attaches now and still needs a separator
+            // before the next manually typed word.
+            pendingGlideSeparator = true
+        } else if isWordJoiner(text) {
+            // Apostrophes and dashes join the current word to what follows.
+            pendingGlideSeparator = false
+            lastGlideWord = nil
+        } else {
+            insert(" ")
+            pendingGlideSeparator = false
+            lastGlideWord = nil
+        }
     }
 }
 
@@ -208,6 +311,7 @@ extension KeyboardViewController: KeyboardViewDelegate {
         switch definition.type {
         case .letter:
             let ch = state.isShifted && state.page == .letters ? definition.shifted : definition.primary
+            prepareForManualCharacter(ch)
             insert(ch)
             state.resetShiftAfterLetter()
             keyboardView.refreshForStateChange()
@@ -225,12 +329,25 @@ extension KeyboardViewController: KeyboardViewDelegate {
             keyboardView.refreshForStateChange()
 
         case .backspace:
-            deleteBackward()
+            if !deleteLastGlideWordIfNeeded() {
+                let context = textDocumentProxy.documentContextBeforeInput ?? ""
+                let isDeletingAttachedPunctuation = pendingGlideSeparator &&
+                    lastGlideWord.map { !context.hasSuffix($0) } == true
+                deleteBackward()
+                if !isDeletingAttachedPunctuation {
+                    pendingGlideSeparator = false
+                    lastGlideWord = nil
+                }
+            }
 
         case .space:
+            pendingGlideSeparator = false
+            lastGlideWord = nil
             insert(" ")
 
         case .returnKey:
+            pendingGlideSeparator = false
+            lastGlideWord = nil
             insert("\n")
 
         case .switchMode:
@@ -259,13 +376,43 @@ extension KeyboardViewController: KeyboardViewDelegate {
     }
 
     func keyboardView(_ view: KeyboardView, didHold definition: KeyDefinition, resolved character: String) {
+        prepareForManualCharacter(character)
         insert(character)
         state.resetShiftAfterLetter()
         keyboardView.refreshForStateChange()
     }
 
+    func keyboardView(_ view: KeyboardView, didGlide trace: [String]) {
+        guard let decoded = engine.decodeGlide(trace) else {
+            if let first = trace.first {
+                let fallback = state.isShifted ? first.uppercased() : first
+                insert(fallback)
+                state.resetShiftAfterLetter()
+                keyboardView.refreshForStateChange()
+            }
+            return
+        }
+        let word = state.isShifted
+            ? decoded.prefix(1).uppercased() + decoded.dropFirst()
+            : decoded
+        if pendingGlideSeparator { insert(" ") }
+        pendingGlideSeparator = false
+        insert(word)
+        pendingGlideSeparator = true
+        lastGlideWord = word
+        refreshSuggestions()
+        state.resetShiftAfterLetter()
+        keyboardView.refreshForStateChange()
+    }
+
     func keyboardViewBackspaceRepeat(_ view: KeyboardView) {
+        pendingGlideSeparator = false
+        lastGlideWord = nil
         deleteBackward()
+    }
+
+    func keyboardView(_ view: KeyboardView, deleteWords count: Int) {
+        deletePreviousWords(count)
     }
 
     func keyboardViewNextKeyboardEvent(_ view: KeyboardView, sender: UIView, event: UIEvent?) {
@@ -280,6 +427,17 @@ extension KeyboardViewController: KeyboardViewDelegate {
 extension KeyboardViewController: SuggestionBarDelegate {
     func suggestionBar(_ bar: SuggestionBarView, didSelect suggestion: String, isAutocorrect: Bool) {
         guard !suggestion.isEmpty else { return }
+        if pendingGlideSeparator {
+            textDocumentProxy.insertText(" " + suggestion + " ")
+            pendingGlideSeparator = false
+            lastGlideWord = nil
+            engine.store.accept(word: suggestion)
+            HapticManager.shared.tap()
+            commitLastWord()
+            updateShiftForContext()
+            refreshSuggestions()
+            return
+        }
         // Remove the partial word (letters) preceding the caret.
         let before = textDocumentProxy.documentContextBeforeInput ?? ""
         var partialCount = 0

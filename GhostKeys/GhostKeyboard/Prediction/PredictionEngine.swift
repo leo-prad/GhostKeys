@@ -115,12 +115,25 @@ final class PredictionEngine {
         return out
     }
 
+    static let profanityBlocklist: Set<String> = [
+        "ass", "shit", "fuck", "bitch", "cunt", "dick", "pussy", "bastard", "cock", "whore", "slut", "nigger", "faggot", "arse", "bollocks", "bugger", "wanker"
+    ]
+
     // MARK: - Prediction
 
     /// Return up to 3 candidate suggestions for the current caret position.
     /// `contextBefore` is the text before the caret (e.g. `documentContextBeforeInput`).
     /// `partial` is the word currently being typed (unfinished token, if any).
     func predict(contextBefore: String, partial: String? = nil) -> [PredictionResult] {
+        let trimmedBefore = contextBefore.trimmingCharacters(in: .whitespacesAndNewlines)
+        if (contextBefore.isEmpty || trimmedBefore.isEmpty) && (partial == nil || partial?.isEmpty == true) {
+            return [
+                PredictionResult(word: "I", score: 10.0),
+                PredictionResult(word: "The", score: 9.0),
+                PredictionResult(word: "And", score: 8.0)
+            ]
+        }
+
         var tokens = PredictionEngine.tokenize(contextBefore)
         var partialWord = partial?.lowercased() ?? ""
 
@@ -137,8 +150,10 @@ final class PredictionEngine {
         var scores: [String: Double] = [:]
 
         func add(_ w: String, base: Double, t: Double) {
-            if !partialWord.isEmpty && !w.hasPrefix(partialWord) { return }
-            if w == partialWord { return }
+            let lower = w.lowercased()
+            if partialWord.isEmpty && PredictionEngine.profanityBlocklist.contains(lower) { return }
+            if !partialWord.isEmpty && !lower.hasPrefix(partialWord) { return }
+            if lower == partialWord { return }
             scores[w, default: 0] += base * NGramStore.recencyBoost(t)
         }
 
@@ -184,6 +199,63 @@ final class PredictionEngine {
             .map { PredictionResult(word: $0.key, score: $0.value) }
             .sorted { $0.score > $1.score }
         return Array(ranked.prefix(3))
+    }
+
+    // MARK: - Glide typing
+
+    /// Resolves a sequence of keys crossed by a swipe into the most likely word.
+    /// Intended letters must occur exactly and in order in the crossed-key path.
+    /// This deliberately favors "no result" over an unrelated common word.
+    func decodeGlide(_ rawTrace: [String]) -> String? {
+        let trace = rawTrace.map { $0.lowercased() }.filter { $0.count == 1 }
+        guard trace.count >= 2, let first = trace.first, let last = trace.last else { return nil }
+
+        func signature(of values: [String]) -> [String] {
+            values.reduce(into: []) { result, value in
+                if result.last != value { result.append(value) }
+            }
+        }
+
+        var pool = Set(dict.orderedWords)
+        pool.formUnion(store.uni.keys)
+        var best: (word: String, score: Double)?
+
+        for word in pool where word.count >= 2 && word.count <= 24 {
+            let lower = word.lowercased()
+            let letters = lower.map(String.init)
+            let intended = signature(of: letters)
+            guard intended.first == first, intended.last == last,
+                  intended.count <= trace.count else { continue }
+
+            var traceIndex = 0
+            var matchedIndices: [Int] = []
+            for letter in intended {
+                guard let found = trace[traceIndex...].firstIndex(of: letter) else {
+                    matchedIndices.removeAll()
+                    break
+                }
+                matchedIndices.append(found)
+                traceIndex = found + 1
+            }
+            guard matchedIndices.count == intended.count else { continue }
+
+            let skippedKeys = max(0, trace.count - intended.count)
+            let coverage = Double(intended.count) / Double(trace.count)
+            // Frequency and learned usage should break ambiguous swipe paths.
+            // A large raw-length bonus made obscure long words beat the short,
+            // common word the user actually traced.
+            var score = coverage * 14 - Double(skippedKeys) * 0.35
+            if intended == trace { score += 30 }
+            if let frequency = dict.baseFrequency[lower] {
+                score += log10(Double(frequency) + 1) * 11
+            } else if let rank = dict.indexByWord[lower] {
+                score += max(0, 18 - log(Double(rank) + 1) * 2)
+            }
+            score += min(30, Double(store.uni[lower]?.f ?? 0) * 5)
+
+            if best == nil || score > best!.score { best = (lower, score) }
+        }
+        return best?.word
     }
 
     // MARK: - Autocorrect
