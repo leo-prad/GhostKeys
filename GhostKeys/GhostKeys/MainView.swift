@@ -23,11 +23,12 @@ struct MainView: View {
                 Section("Welcome") {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("GhostKeys")
-                            .font(.largeTitle).bold()
+                            .font(.title2).bold()
                         Text("A native iOS keyboard with Gboard-style long-press symbols and adaptive next-word prediction.")
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 2)
                 }
 
                 Section("Setup") {
@@ -109,7 +110,11 @@ struct MainView: View {
                     }
                 }
             }
+            .font(.subheadline)
+            .listStyle(.plain)
+            .listSectionSpacing(.compact)
             .navigationTitle("Keyboard Settings")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }

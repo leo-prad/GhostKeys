@@ -39,7 +39,9 @@ final class SuggestionItemView: UIView {
         addSubview(label)
         NSLayoutConstraint.activate([
             label.centerXAnchor.constraint(equalTo: centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -2),
+            // SF Pro's visual center sits slightly below its geometric line
+            // box. Lift it enough to look centered in the full suggestion area.
+            label.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -5),
             label.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 8),
             label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8),
 

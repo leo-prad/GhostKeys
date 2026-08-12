@@ -2,6 +2,10 @@ import UIKit
 
 /// Long-press popup showing alternate characters in a 2-row stacked layout (accents on top, symbol/number on bottom with blue badge), matching ghostkeys-simulator.html.
 final class PopupKeyView: UIView {
+    static let optionWidth: CGFloat = 32
+    static let optionSpacing: CGFloat = 3
+    static let contentInset: CGFloat = 6
+
     private let containerStack = UIStackView()
     private let topStack = UIStackView()
     private let bottomStack = UIStackView()
@@ -25,29 +29,36 @@ final class PopupKeyView: UIView {
         backgroundColor = theme.popupBackground
         layer.cornerRadius = 10
         layer.cornerCurve = .continuous
+        layer.borderColor = theme.keyPreviewBorder.cgColor
+        layer.borderWidth = 1
         layer.shadowColor = UIColor.black.cgColor
         layer.shadowOpacity = 0.40
         layer.shadowRadius = 10
         layer.shadowOffset = CGSize(width: 0, height: 4)
 
         containerStack.axis = .vertical
-        containerStack.spacing = 3
+        containerStack.spacing = Self.optionSpacing
         // Trailing alignment makes a short number/symbol row hug the popup's
         // right edge, matching the reference layout.
         containerStack.alignment = .trailing
         containerStack.distribution = .fill
         containerStack.translatesAutoresizingMaskIntoConstraints = false
         containerStack.isLayoutMarginsRelativeArrangement = true
-        containerStack.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6)
+        containerStack.directionalLayoutMargins = NSDirectionalEdgeInsets(
+            top: Self.contentInset,
+            leading: Self.contentInset,
+            bottom: Self.contentInset,
+            trailing: Self.contentInset
+        )
         addSubview(containerStack)
 
         topStack.axis = .horizontal
-        topStack.spacing = 3
+        topStack.spacing = Self.optionSpacing
         topStack.alignment = .fill
         topStack.distribution = .fillEqually
 
         bottomStack.axis = .horizontal
-        bottomStack.spacing = 3
+        bottomStack.spacing = Self.optionSpacing
         bottomStack.alignment = .fill
         bottomStack.distribution = .fillEqually
 
@@ -110,7 +121,7 @@ final class PopupKeyView: UIView {
         l.layer.masksToBounds = true
         l.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
-            l.widthAnchor.constraint(equalToConstant: 40),
+            l.widthAnchor.constraint(equalToConstant: Self.optionWidth),
             l.heightAnchor.constraint(equalToConstant: 55)
         ])
 

@@ -159,9 +159,9 @@ final class KeyboardView: UIView {
                 continue
             }
 
-            // Row 3 touches both side margins. On the symbol pages, keep the
-            // mode and delete keys at their normal modifier width and give the
-            // remaining width to the punctuation keys, matching Apple's layout.
+            // Keep the third-row modifier keys identical on every page. Symbol
+            // punctuation is slightly wider than a letter, but it must not
+            // stretch to consume all remaining space.
             let firstType = row.first?.definition.type
             let lastType = row.last?.definition.type
             let isRow3 = (r == 2 && (firstType == .shift || firstType == .switchMode) && lastType == .backspace)
@@ -169,18 +169,20 @@ final class KeyboardView: UIView {
             if isRow3 && row.count > 2 {
                 let middleCount = row.count - 2
                 let totalSpacing = CGFloat(row.count - 1) * hSpacing
-                let sideKeyW: CGFloat
-                let middleKeyW: CGFloat
+                // The alphabet row has seven letters and eight gaps. Deriving
+                // one canonical side-key width from it keeps shift/#+= and
+                // backspace the same size across all three pages.
+                let alphabetMiddleCount: CGFloat = 7
+                let alphabetSpacingCount: CGFloat = 8
+                let sideKeyW = (usableW
+                    - alphabetSpacingCount * hSpacing
+                    - alphabetMiddleCount * baseW) / 2.0
+                let middleKeyW = firstType == .switchMode ? baseW * 1.3 : baseW
+                let rowWidth = sideKeyW * 2
+                    + CGFloat(middleCount) * middleKeyW
+                    + totalSpacing
 
-                if firstType == .switchMode {
-                    sideKeyW = row[0].definition.widthMultiplier * baseW
-                    middleKeyW = (usableW - totalSpacing - sideKeyW * 2) / CGFloat(middleCount)
-                } else {
-                    middleKeyW = baseW
-                    sideKeyW = (usableW - totalSpacing - CGFloat(middleCount) * middleKeyW) / 2.0
-                }
-
-                var x = sideMargin
+                var x = sideMargin + (usableW - rowWidth) / 2.0
                 for (i, k) in row.enumerated() {
                     let keyW = (i == 0 || i == row.count - 1) ? sideKeyW : middleKeyW
                     k.frame = CGRect(x: x, y: y, width: keyW, height: rowH)
@@ -276,7 +278,9 @@ final class KeyboardView: UIView {
         let popupHeight: CGFloat = isTwoRows ? 125 : 67
         let colCount = max(1, max(topCount, bottomCount))
         let popupWidth: CGFloat = min(targetParent.bounds.width - 8,
-                                      CGFloat(colCount) * 40 + CGFloat(max(0, colCount - 1)) * 3 + 12)
+                                      CGFloat(colCount) * PopupKeyView.optionWidth
+                                        + CGFloat(max(0, colCount - 1)) * PopupKeyView.optionSpacing
+                                        + PopupKeyView.contentInset * 2)
 
         // Convert key frame to targetParent coordinates
         let keyFrameInTarget = key.convert(key.bounds, to: targetParent)
@@ -319,8 +323,8 @@ final class KeyboardView: UIView {
 
         let targetParent: UIView = superview ?? self
         let keyFrame = key.convert(key.bounds, to: targetParent)
-        let previewWidth = max(52, keyFrame.width + 18)
-        let capHeight = max(52, keyFrame.height * 1.2)
+        let previewWidth = max(58, keyFrame.width + 20)
+        let capHeight = max(72, keyFrame.height * 1.55)
         let previewTop = max(2, keyFrame.minY - capHeight)
         // The narrow stem occupies the pressed key itself. Previously the
         // preview extended almost a full row below the key, making J appear to
@@ -625,9 +629,9 @@ private final class KeyPreviewView: UIView {
         layer.shadowRadius = 8
         layer.shadowOffset = CGSize(width: 0, height: 3)
 
-        shape.fillColor = theme.keyBackground.cgColor
-        shape.strokeColor = theme.keyTextColor.withAlphaComponent(0.18).cgColor
-        shape.lineWidth = 1
+        shape.fillColor = theme.keyPreviewBackground.cgColor
+        shape.strokeColor = theme.keyPreviewBorder.cgColor
+        shape.lineWidth = 1.25
         layer.addSublayer(shape)
 
         label.text = text
