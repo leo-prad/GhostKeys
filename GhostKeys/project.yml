@@ -49,3 +49,21 @@ targets:
         CODE_SIGN_ENTITLEMENTS: GhostKeyboard/GhostKeyboard.entitlements
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: NO
+
+schemes:
+  GhostKeys:
+    build:
+      targets:
+        GhostKeys: all
+        GhostKeyboard: all
+    run:
+      config: Debug
+      executable: GhostKeys
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
