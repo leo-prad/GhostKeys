@@ -19,9 +19,12 @@ targets:
     sources:
       - path: GhostKeys
       - path: Shared
+        excludes:
+          - "Resources/**"
     resources:
       - path: GhostKeys/Assets.xcassets
         optional: true
+      - path: Shared/Resources/lexicon.json
     info:
       path: GhostKeys/Info.plist
     entitlements:
@@ -32,6 +35,7 @@ targets:
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - target: GhostKeyboard
 
@@ -41,8 +45,10 @@ targets:
     sources:
       - path: GhostKeyboard
       - path: Shared
+        excludes:
+          - "Resources/**"
     resources:
-      - path: GhostKeyboard/Resources/lexicon.json
+      - path: Shared/Resources/lexicon.json
     info:
       path: GhostKeyboard/Info.plist
     entitlements:

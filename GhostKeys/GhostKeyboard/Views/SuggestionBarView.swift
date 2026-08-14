@@ -130,13 +130,13 @@ final class SuggestionBarView: UIView {
             if i < 2 {
                 let sep = UIView()
                 sep.isUserInteractionEnabled = false
-                sep.backgroundColor = theme.keyTextColor.withAlphaComponent(0.15)
+                sep.backgroundColor = theme.keyTextColor.withAlphaComponent(0.35)
                 sep.translatesAutoresizingMaskIntoConstraints = false
                 addSubview(sep)
                 NSLayoutConstraint.activate([
                     sep.widthAnchor.constraint(equalToConstant: 1.0 / UIScreen.main.scale),
-                    sep.topAnchor.constraint(equalTo: topAnchor, constant: 8),
-                    sep.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
+                    sep.centerYAnchor.constraint(equalTo: centerYAnchor),
+                    sep.heightAnchor.constraint(equalTo: heightAnchor, multiplier: 0.55),
                     sep.leadingAnchor.constraint(equalTo: item.trailingAnchor)
                 ])
             }

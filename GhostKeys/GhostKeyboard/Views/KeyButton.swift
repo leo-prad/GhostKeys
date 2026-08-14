@@ -15,7 +15,12 @@ final class KeyButton: UIView {
     let iconImageView = UIImageView()
 
     private var theme: KeyboardTheme
-    private var isHighlighted = false { didSet { applyBackground() } }
+    private var isHighlighted = false {
+        didSet {
+            applyBackground()
+            if definition.type == .backspace { updateContent() }
+        }
+    }
 
     /// Displayed label for the current shift state.
     var displayString: String = "" {
@@ -83,18 +88,19 @@ final class KeyButton: UIView {
             label.isHidden = true
             iconImageView.isHidden = false
             let config = UIImage.SymbolConfiguration(pointSize: 19, weight: .semibold)
-            if displayString == "⇪" {
-                iconImageView.image = UIImage(systemName: "capslock.fill", withConfiguration: config)
-            } else if displayString == "⇧" {
-                iconImageView.image = UIImage(systemName: "shift.fill", withConfiguration: config)
-            } else {
-                iconImageView.image = UIImage(systemName: "shift", withConfiguration: config)
+            let name: String
+            switch displayString {
+            case "⇪": name = "capslock.fill"
+            case "⇧": name = "shift.fill"
+            default:  name = "shift"
             }
+            iconImageView.image = UIImage(systemName: name, withConfiguration: config)
         case .backspace:
             label.isHidden = true
             iconImageView.isHidden = false
             let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .regular)
-            iconImageView.image = UIImage(systemName: "delete.left", withConfiguration: config)
+            let name = isHighlighted ? "delete.left.fill" : "delete.left"
+            iconImageView.image = UIImage(systemName: name, withConfiguration: config)
         default:
             label.isHidden = false
             iconImageView.isHidden = true

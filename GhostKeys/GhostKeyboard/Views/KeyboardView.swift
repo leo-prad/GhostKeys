@@ -107,7 +107,11 @@ final class KeyboardView: UIView {
                         k.displayString = k.definition.primary
                     }
                 case .shift:
-                    k.displayString = state.shiftMode == .capsLock ? "⇪" : "⇧"
+                    switch state.shiftMode {
+                    case .capsLock:  k.displayString = "⇪"
+                    case .uppercase: k.displayString = "⇧"
+                    case .lowercase: k.displayString = "⇧̊"
+                    }
                 case .switchMode:
                     // Set label per context (123 vs ABC vs #+=).
                     switch state.page {
@@ -145,16 +149,38 @@ final class KeyboardView: UIView {
 
             // For rows containing a .space, stretch space to fill available width.
             if let spaceIdx = row.firstIndex(where: { $0.definition.type == .space }) {
+                // Bottom row: size non-space keys so the switchMode key (123 or
+                // ABC) matches the return key width for a symmetric look. A
+                // small extra padding around the space key gives it breathing
+                // room from its neighbors, so the space doesn't butt right up
+                // against them.
+                let spaceSidePadding: CGFloat = 4
+                let returnWidth: CGFloat = KeyDefinition.returnKey.widthMultiplier * baseW
                 var fixed: CGFloat = 0
                 for (i, k) in row.enumerated() where i != spaceIdx {
-                    fixed += k.definition.widthMultiplier * baseW
+                    let mul: CGFloat
+                    if k.definition.type == .switchMode {
+                        mul = KeyDefinition.returnKey.widthMultiplier
+                    } else {
+                        mul = k.definition.widthMultiplier
+                    }
+                    fixed += mul * baseW
                 }
-                let spaceW = usableW - fixed - CGFloat(row.count - 1) * hSpacing
+                let spaceW = usableW - fixed - CGFloat(row.count - 1) * hSpacing - spaceSidePadding * 2
                 var x = sideMargin
                 for (i, k) in row.enumerated() {
-                    let keyW = (i == spaceIdx) ? spaceW : (k.definition.widthMultiplier * baseW)
-                    k.frame = CGRect(x: x, y: y, width: keyW, height: rowH)
-                    x += keyW + hSpacing
+                    let keyW: CGFloat
+                    if i == spaceIdx {
+                        keyW = spaceW
+                    } else if k.definition.type == .switchMode {
+                        keyW = returnWidth
+                    } else {
+                        keyW = k.definition.widthMultiplier * baseW
+                    }
+                    let framedX = (i == spaceIdx) ? x + spaceSidePadding : x
+                    k.frame = CGRect(x: framedX, y: y, width: keyW, height: rowH)
+                    let advance = (i == spaceIdx) ? keyW + spaceSidePadding * 2 : keyW
+                    x += advance + hSpacing
                 }
                 continue
             }
