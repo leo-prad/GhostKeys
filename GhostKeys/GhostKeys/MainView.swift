@@ -110,7 +110,6 @@ struct MainView: View {
                     }
                 }
             }
-            .font(.subheadline)
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .navigationTitle("Keyboard Settings")
