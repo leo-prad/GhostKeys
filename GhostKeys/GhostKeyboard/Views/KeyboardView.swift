@@ -144,8 +144,13 @@ final class KeyboardView: UIView {
         let usableW = w - sideMargin * 2
         let baseW = (usableW - hSpacing * 9) / 10.0
 
+        // First pass: compute each key's *visual* keycap frame (the spaced-out
+        // rounded rects the user sees). These match the classic layout exactly.
+        var visual: [[CGRect]] = []
+
         for (r, row) in rows.enumerated() {
             let y = topMargin + CGFloat(r) * (rowH + vSpacing)
+            var frames: [CGRect] = []
 
             // For rows containing a .space, stretch space to fill available width.
             if let spaceIdx = row.firstIndex(where: { $0.definition.type == .space }) {
@@ -178,10 +183,11 @@ final class KeyboardView: UIView {
                         keyW = k.definition.widthMultiplier * baseW
                     }
                     let framedX = (i == spaceIdx) ? x + spaceSidePadding : x
-                    k.frame = CGRect(x: framedX, y: y, width: keyW, height: rowH)
+                    frames.append(CGRect(x: framedX, y: y, width: keyW, height: rowH))
                     let advance = (i == spaceIdx) ? keyW + spaceSidePadding * 2 : keyW
                     x += advance + hSpacing
                 }
+                visual.append(frames)
                 continue
             }
 
@@ -210,11 +216,12 @@ final class KeyboardView: UIView {
                 let gap = (usableW - contentWidth) / CGFloat(row.count - 1)
 
                 var x = sideMargin
-                for (i, k) in row.enumerated() {
+                for (i, _) in row.enumerated() {
                     let keyW = (i == 0 || i == row.count - 1) ? sideKeyW : middleKeyW
-                    k.frame = CGRect(x: x, y: y, width: keyW, height: rowH)
+                    frames.append(CGRect(x: x, y: y, width: keyW, height: rowH))
                     x += keyW + gap
                 }
+                visual.append(frames)
                 continue
             }
 
@@ -227,58 +234,50 @@ final class KeyboardView: UIView {
             var x = sideMargin + (usableW - rowWidth) / 2.0
             for k in row {
                 let keyW = k.definition.widthMultiplier * baseW
-                k.frame = CGRect(x: x, y: y, width: keyW, height: rowH)
+                frames.append(CGRect(x: x, y: y, width: keyW, height: rowH))
                 x += keyW + hSpacing
             }
-        }
-    }
-
-    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        guard bounds.contains(point), !rows.isEmpty else {
-            return super.hitTest(point, with: event)
+            visual.append(frames)
         }
 
-        // Give delete the complete right-hand side of its row, including the
-        // edge inset. There is no dead strip between the key and screen edge.
-        if let backspaceRow = rows.first(where: { $0.contains(where: { $0.definition.type == .backspace }) }),
-           let backspace = backspaceRow.first(where: { $0.definition.type == .backspace }) {
-            let deleteRegion = CGRect(x: backspace.frame.minX - 14,
-                                      y: backspace.frame.minY - 4,
-                                      width: bounds.maxX - backspace.frame.minX + 14,
-                                      height: backspace.frame.height + 8)
-            if deleteRegion.contains(point) {
-                return backspace
+        // Second pass: expand every keycap into a touch tile that fills the gaps
+        // to its neighbors, so the keyboard is tiled edge to edge with no dead
+        // zones. Vertically, each row splits the inter-row gap with the rows
+        // above/below (outer rows reach the keyboard's top/bottom edge).
+        // Horizontally, each key splits the gap with its row neighbors (outer
+        // keys reach the keyboard's left/right edge). The visible keycap stays
+        // exactly where it was — it's handed back to the key as `capRect`.
+        for (r, row) in rows.enumerated() {
+            guard r < visual.count, !row.isEmpty else { continue }
+            let vf = visual[r]
+
+            let rowTop = vf[0].minY
+            let rowBottom = vf[0].maxY
+            let tileTop: CGFloat = r == 0
+                ? 0
+                : (visual[r - 1][0].maxY + rowTop) / 2
+            let tileBottom: CGFloat = r == rows.count - 1
+                ? h
+                : (rowBottom + visual[r + 1][0].minY) / 2
+
+            for (i, k) in row.enumerated() {
+                let f = vf[i]
+                let tileLeft: CGFloat = i == 0
+                    ? 0
+                    : (vf[i - 1].maxX + f.minX) / 2
+                let tileRight: CGFloat = i == row.count - 1
+                    ? w
+                    : (f.maxX + vf[i + 1].minX) / 2
+
+                let tile = CGRect(x: tileLeft, y: tileTop,
+                                  width: tileRight - tileLeft,
+                                  height: tileBottom - tileTop)
+                k.frame = tile
+                // Visible keycap position, expressed in the tile's coordinates.
+                k.capRect = CGRect(x: f.minX - tileLeft, y: f.minY - tileTop,
+                                   width: f.width, height: f.height)
             }
         }
-
-        // Every point inside the keyboard resolves to some key. Pick the row
-        // whose vertical band is nearest to point.y (so taps just above or
-        // below a row still land), then the key in that row whose midX is
-        // nearest to point.x (so side margins and horizontal gaps resolve to
-        // the neighboring key). Return the key directly — do not delegate to
-        // its own hitTest, because point(inside:) on a KeyButton would reject
-        // the routed localPoint and iOS would drop the touch.
-        var bestRow: [KeyButton] = rows[0]
-        var bestRowDistance: CGFloat = .greatestFiniteMagnitude
-        for row in rows where !row.isEmpty {
-            let top = row[0].frame.minY
-            let bottom = row[0].frame.maxY
-            let distance: CGFloat
-            if point.y < top { distance = top - point.y }
-            else if point.y > bottom { distance = point.y - bottom }
-            else { distance = 0 }
-            if distance < bestRowDistance {
-                bestRowDistance = distance
-                bestRow = row
-            }
-        }
-
-        guard let nearest = bestRow.min(by: {
-            abs($0.frame.midX - point.x) < abs($1.frame.midX - point.x)
-        }) else {
-            return super.hitTest(point, with: event)
-        }
-        return nearest
     }
 
     // MARK: - Popup helpers
@@ -315,8 +314,8 @@ final class KeyboardView: UIView {
                                         + CGFloat(max(0, colCount - 1)) * PopupKeyView.optionSpacing
                                         + PopupKeyView.contentInset * 2)
 
-        // Convert key frame to targetParent coordinates
-        let keyFrameInTarget = key.convert(key.bounds, to: targetParent)
+        // Anchor to the visible keycap, not the (larger) touch tile.
+        let keyFrameInTarget = key.capFrame(in: targetParent)
 
         let proposedAboveY = keyFrameInTarget.minY - popupHeight - 8
         let popupY: CGFloat
@@ -355,7 +354,7 @@ final class KeyboardView: UIView {
               !key.displayString.isEmpty else { return }
 
         let targetParent: UIView = superview ?? self
-        let keyFrame = key.convert(key.bounds, to: targetParent)
+        let keyFrame = key.capFrame(in: targetParent)
         let previewWidth = max(58, keyFrame.width + 20)
         let capHeight = max(72, keyFrame.height * 1.55)
         let previewTop = max(2, keyFrame.minY - capHeight)
@@ -406,8 +405,10 @@ final class KeyboardView: UIView {
 
     private func letterKey(at point: CGPoint) -> KeyButton? {
         guard currentPage == .letters else { return nil }
+        // Tiles cover the whole keyboard edge to edge, so a plain frame test
+        // assigns each point to exactly one key.
         return rows.joined().first {
-            $0.definition.type == .letter && $0.frame.insetBy(dx: -3, dy: -3).contains(point)
+            $0.definition.type == .letter && $0.frame.contains(point)
         }
     }
 
