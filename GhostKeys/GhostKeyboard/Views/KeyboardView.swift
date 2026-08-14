@@ -168,7 +168,6 @@ final class KeyboardView: UIView {
 
             if isRow3 && row.count > 2 {
                 let middleCount = row.count - 2
-                let totalSpacing = CGFloat(row.count - 1) * hSpacing
                 // The alphabet row has seven letters and eight gaps. Deriving
                 // one canonical side-key width from it keeps shift/#+= and
                 // backspace the same size across all three pages.
@@ -178,15 +177,17 @@ final class KeyboardView: UIView {
                     - alphabetSpacingCount * hSpacing
                     - alphabetMiddleCount * baseW) / 2.0
                 let middleKeyW = firstType == .switchMode ? baseW * 1.3 : baseW
-                let rowWidth = sideKeyW * 2
-                    + CGFloat(middleCount) * middleKeyW
-                    + totalSpacing
+                let contentWidth = sideKeyW * 2 + CGFloat(middleCount) * middleKeyW
+                // Pin side keys flush to the row edges and widen the gaps
+                // between the middle keys so #+= / backspace sit at the same
+                // horizontal position as shift / backspace on the letters page.
+                let gap = (usableW - contentWidth) / CGFloat(row.count - 1)
 
-                var x = sideMargin + (usableW - rowWidth) / 2.0
+                var x = sideMargin
                 for (i, k) in row.enumerated() {
                     let keyW = (i == 0 || i == row.count - 1) ? sideKeyW : middleKeyW
                     k.frame = CGRect(x: x, y: y, width: keyW, height: rowH)
-                    x += keyW + hSpacing
+                    x += keyW + gap
                 }
                 continue
             }

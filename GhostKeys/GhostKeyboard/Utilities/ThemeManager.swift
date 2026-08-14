@@ -20,7 +20,7 @@ enum ThemeManager {
         if style == .dark {
             return KeyboardTheme(
                 keyBackground: UIColor(red: 106.0 / 255.0, green: 106.0 / 255.0, blue: 106.0 / 255.0, alpha: 1.0),
-                specialKeyBackground: UIColor(red: 0.29, green: 0.29, blue: 0.30, alpha: 1.0),
+                specialKeyBackground: UIColor(red: 106.0 / 255.0, green: 106.0 / 255.0, blue: 106.0 / 255.0, alpha: 1.0),
                 keyTextColor: .white,
                 keyHighlightColor: UIColor(red: 0.60, green: 0.60, blue: 0.62, alpha: 1.0),
                 suggestionBarBackground: .clear,
@@ -35,7 +35,7 @@ enum ThemeManager {
         } else {
             return KeyboardTheme(
                 keyBackground: .white,
-                specialKeyBackground: UIColor(red: 0.67, green: 0.70, blue: 0.75, alpha: 1.0),
+                specialKeyBackground: .white,
                 keyTextColor: .black,
                 keyHighlightColor: UIColor(red: 0.83, green: 0.85, blue: 0.88, alpha: 1.0),
                 suggestionBarBackground: .clear,
