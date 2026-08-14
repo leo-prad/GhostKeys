@@ -111,8 +111,8 @@ struct MainView: View {
                 }
             }
             .font(.subheadline)
-            .listStyle(.plain)
-            .listSectionSpacing(.compact)
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
             .navigationTitle("Keyboard Settings")
             .navigationBarTitleDisplayMode(.inline)
         }
