@@ -148,7 +148,12 @@ final class KeyButton: UIView {
         if definition.type == .backspace {
             return bounds.insetBy(dx: -10, dy: -6).contains(point)
         }
-        return super.point(inside: point, with: event)
+        // KeyboardView.hitTest routes taps in gaps and side margins to the
+        // nearest key by midX. iOS re-verifies point(inside:) on the returned
+        // view, so accept generously along the horizontal axis — the routing
+        // decision has already picked us. Vertical tolerance covers the small
+        // gap between rows so taps between rows still resolve to a key.
+        return point.y >= -6 && point.y <= bounds.height + 6
     }
 
     // MARK: - Touch handling
