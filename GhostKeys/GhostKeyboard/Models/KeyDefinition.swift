@@ -25,7 +25,7 @@ struct KeyDefinition {
     static let shift    = KeyDefinition(primary: "⇧", shifted: "⇧", holdCharacters: [], widthMultiplier: 1.35, type: .shift)
     static let backspace = KeyDefinition(primary: "⌫", shifted: "⌫", holdCharacters: [], widthMultiplier: 1.35, type: .backspace)
     static let space    = KeyDefinition(primary: "", shifted: "", holdCharacters: [], widthMultiplier: 4.5, type: .space)
-    static let returnKey = KeyDefinition(primary: "return", shifted: "return", holdCharacters: [], widthMultiplier: 2.0, type: .returnKey)
+    static let returnKey = KeyDefinition(primary: "return", shifted: "return", holdCharacters: [], widthMultiplier: 2.7, type: .returnKey)
     static let switch123 = KeyDefinition(primary: "123", shifted: "123", holdCharacters: [], widthMultiplier: 1.35, type: .switchMode)
     static let switchABC = KeyDefinition(primary: "ABC", shifted: "ABC", holdCharacters: [], widthMultiplier: 1.35, type: .switchMode)
     static let switchSym = KeyDefinition(primary: "#+=", shifted: "#+=", holdCharacters: [], widthMultiplier: 1.35, type: .switchMode)

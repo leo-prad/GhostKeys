@@ -35,7 +35,7 @@ final class KeyButton: UIView {
 
     private func setup() {
         isMultipleTouchEnabled = false
-        layer.cornerRadius = 8
+        layer.cornerRadius = 10
         layer.cornerCurve = .continuous
         layer.shadowColor = theme.keyShadowColor.cgColor
         layer.shadowOffset = CGSize(width: 0, height: 1)

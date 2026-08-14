@@ -7,6 +7,10 @@ protocol KeyboardViewDelegate: AnyObject {
     func keyboardViewBackspaceRepeat(_ view: KeyboardView)
     func keyboardView(_ view: KeyboardView, deleteWords count: Int)
     func keyboardViewNextKeyboardEvent(_ view: KeyboardView, sender: UIView, event: UIEvent?)
+    /// Hold-space cursor drag lifecycle.
+    func keyboardViewSpaceCursorBegan(_ view: KeyboardView)
+    func keyboardViewSpaceCursorMove(_ view: KeyboardView, characterOffset: Int)
+    func keyboardViewSpaceCursorEnded(_ view: KeyboardView)
 }
 
 /// Main keyboard container. Lays out rows for the current page.
@@ -38,6 +42,12 @@ final class KeyboardView: UIView {
     private var glidePoints: [CGPoint] = []
     private let glideLayer = CAShapeLayer()
     private var backspaceSwipeWords = 0
+
+    // Hold-space cursor drag
+    private var spaceHoldTimer: Timer?
+    private var spaceCursorMode = false
+    private var spaceCursorLastX: CGFloat = 0
+    private static let spaceCursorPointsPerChar: CGFloat = 9
 
     init(state: KeyboardState, theme: KeyboardTheme) {
         self.state = state
@@ -149,9 +159,9 @@ final class KeyboardView: UIView {
                 continue
             }
 
-            // Row 3 touches both side margins. On the symbol pages, keep the
-            // mode and delete keys at their normal modifier width and give the
-            // remaining width to the punctuation keys, matching Apple's layout.
+            // Keep the third-row modifier keys identical on every page. Symbol
+            // punctuation is slightly wider than a letter, but it must not
+            // stretch to consume all remaining space.
             let firstType = row.first?.definition.type
             let lastType = row.last?.definition.type
             let isRow3 = (r == 2 && (firstType == .shift || firstType == .switchMode) && lastType == .backspace)
@@ -159,18 +169,20 @@ final class KeyboardView: UIView {
             if isRow3 && row.count > 2 {
                 let middleCount = row.count - 2
                 let totalSpacing = CGFloat(row.count - 1) * hSpacing
-                let sideKeyW: CGFloat
-                let middleKeyW: CGFloat
+                // The alphabet row has seven letters and eight gaps. Deriving
+                // one canonical side-key width from it keeps shift/#+= and
+                // backspace the same size across all three pages.
+                let alphabetMiddleCount: CGFloat = 7
+                let alphabetSpacingCount: CGFloat = 8
+                let sideKeyW = (usableW
+                    - alphabetSpacingCount * hSpacing
+                    - alphabetMiddleCount * baseW) / 2.0
+                let middleKeyW = firstType == .switchMode ? baseW * 1.3 : baseW
+                let rowWidth = sideKeyW * 2
+                    + CGFloat(middleCount) * middleKeyW
+                    + totalSpacing
 
-                if firstType == .switchMode {
-                    sideKeyW = row[0].definition.widthMultiplier * baseW
-                    middleKeyW = (usableW - totalSpacing - sideKeyW * 2) / CGFloat(middleCount)
-                } else {
-                    middleKeyW = baseW
-                    sideKeyW = (usableW - totalSpacing - CGFloat(middleCount) * middleKeyW) / 2.0
-                }
-
-                var x = sideMargin
+                var x = sideMargin + (usableW - rowWidth) / 2.0
                 for (i, k) in row.enumerated() {
                     let keyW = (i == 0 || i == row.count - 1) ? sideKeyW : middleKeyW
                     k.frame = CGRect(x: x, y: y, width: keyW, height: rowH)
@@ -266,7 +278,9 @@ final class KeyboardView: UIView {
         let popupHeight: CGFloat = isTwoRows ? 125 : 67
         let colCount = max(1, max(topCount, bottomCount))
         let popupWidth: CGFloat = min(targetParent.bounds.width - 8,
-                                      CGFloat(colCount) * 40 + CGFloat(max(0, colCount - 1)) * 3 + 12)
+                                      CGFloat(colCount) * PopupKeyView.optionWidth
+                                        + CGFloat(max(0, colCount - 1)) * PopupKeyView.optionSpacing
+                                        + PopupKeyView.contentInset * 2)
 
         // Convert key frame to targetParent coordinates
         let keyFrameInTarget = key.convert(key.bounds, to: targetParent)
@@ -309,8 +323,8 @@ final class KeyboardView: UIView {
 
         let targetParent: UIView = superview ?? self
         let keyFrame = key.convert(key.bounds, to: targetParent)
-        let previewWidth = max(52, keyFrame.width + 18)
-        let capHeight = max(52, keyFrame.height * 1.2)
+        let previewWidth = max(58, keyFrame.width + 20)
+        let capHeight = max(72, keyFrame.height * 1.55)
         let previewTop = max(2, keyFrame.minY - capHeight)
         // The narrow stem occupies the pressed key itself. Previously the
         // preview extended almost a full row below the key, making J appear to
@@ -339,13 +353,17 @@ final class KeyboardView: UIView {
     private func startBackspaceRepeat() {
         stopBackspaceRepeat()
         let speed = max(0.02, SharedDefaults.double(SharedDefaults.Key.backspaceSpeedMs, default: 80) / 1000.0)
-        backspaceTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: false) { [weak self] _ in
+        let initial = Timer(timeInterval: 0.35, repeats: false) { [weak self] _ in
             guard let self = self else { return }
-            self.backspaceTimer = Timer.scheduledTimer(withTimeInterval: speed, repeats: true) { [weak self] _ in
+            let repeating = Timer(timeInterval: speed, repeats: true) { [weak self] _ in
                 guard let self = self else { return }
                 self.delegate?.keyboardViewBackspaceRepeat(self)
             }
+            RunLoop.main.add(repeating, forMode: .common)
+            self.backspaceTimer = repeating
         }
+        RunLoop.main.add(initial, forMode: .common)
+        backspaceTimer = initial
     }
 
     private func stopBackspaceRepeat() {
@@ -407,6 +425,9 @@ final class KeyboardView: UIView {
 extension KeyboardView: KeyButtonDelegate {
     func keyButton(_ button: KeyButton, didBegin touch: UITouch) {
         holdTimer?.invalidate()
+        spaceHoldTimer?.invalidate()
+        spaceHoldTimer = nil
+        spaceCursorMode = false
         touchStart = touch.location(in: self)
         touchStartTimestamp = touch.timestamp
         lastTouchPoint = touchStart
@@ -439,11 +460,32 @@ extension KeyboardView: KeyButtonDelegate {
             return
         }
 
+        if button.definition.type == .space {
+            // Long-press on space enters iOS-style cursor-drag mode: after a
+            // short hold, horizontal finger motion moves the caret instead of
+            // inserting a space on lift.
+            spaceCursorLastX = touchStart.x
+            let t = Timer(timeInterval: max(0.28, holdThreshold), repeats: false) { [weak self] _ in
+                guard let self = self else { return }
+                self.spaceCursorMode = true
+                self.delegate?.keyboardViewSpaceCursorBegan(self)
+                HapticManager.shared.special()
+            }
+            RunLoop.main.add(t, forMode: .common)
+            spaceHoldTimer = t
+        }
+
         if !button.definition.holdCharacters.isEmpty {
-            holdTimer = Timer.scheduledTimer(withTimeInterval: holdThreshold, repeats: false) { [weak self, weak button] _ in
+            // Schedule on .common modes so the timer fires uniformly across all
+            // keys — otherwise edge keys need a much longer hold because the
+            // runloop stays in .tracking mode during finger micro-motion and
+            // .default-mode timers never fire until touchesEnded.
+            let t = Timer(timeInterval: holdThreshold, repeats: false) { [weak self, weak button] _ in
                 guard let self = self, let button = button else { return }
                 self.showPopup(for: button)
             }
+            RunLoop.main.add(t, forMode: .common)
+            holdTimer = t
         }
     }
 
@@ -454,6 +496,21 @@ extension KeyboardView: KeyButtonDelegate {
 
         if glideDistance > 6 {
             hideKeyPreview()
+        }
+
+        // Hold-space cursor drag: while the mode is active, translate horizontal
+        // finger motion into character offsets and eat the event so it isn't
+        // also interpreted as anything else.
+        if button.definition.type == .space, spaceCursorMode {
+            let dx = point.x - spaceCursorLastX
+            let step = KeyboardView.spaceCursorPointsPerChar
+            let n = Int((dx / step).rounded(.towardZero))
+            if n != 0 {
+                delegate?.keyboardViewSpaceCursorMove(self, characterOffset: n)
+                spaceCursorLastX += CGFloat(n) * step
+            }
+            lastTouchPoint = point
+            return
         }
 
         if button.definition.type == .backspace {
@@ -495,6 +552,19 @@ extension KeyboardView: KeyButtonDelegate {
         holdTimer?.invalidate()
         holdTimer = nil
         hideKeyPreview()
+
+        // End any active space cursor drag. If we were in cursor mode, do NOT
+        // fall through to the tap path — the user was moving the caret, not
+        // inserting a space.
+        if button.definition.type == .space {
+            spaceHoldTimer?.invalidate()
+            spaceHoldTimer = nil
+            if spaceCursorMode {
+                spaceCursorMode = false
+                delegate?.keyboardViewSpaceCursorEnded(self)
+                return
+            }
+        }
 
         if button.definition.type == .backspace {
             stopBackspaceRepeat()
@@ -559,9 +629,9 @@ private final class KeyPreviewView: UIView {
         layer.shadowRadius = 8
         layer.shadowOffset = CGSize(width: 0, height: 3)
 
-        shape.fillColor = theme.keyBackground.cgColor
-        shape.strokeColor = theme.keyTextColor.withAlphaComponent(0.18).cgColor
-        shape.lineWidth = 1
+        shape.fillColor = theme.keyPreviewBackground.cgColor
+        shape.strokeColor = theme.keyPreviewBorder.cgColor
+        shape.lineWidth = 1.25
         layer.addSublayer(shape)
 
         label.text = text

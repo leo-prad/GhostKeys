@@ -9,6 +9,8 @@ struct KeyboardTheme {
     let keyboardBackground: UIColor
     let keyShadowColor: UIColor
     let popupBackground: UIColor
+    let keyPreviewBackground: UIColor
+    let keyPreviewBorder: UIColor
     let popupHighlight: UIColor
     let accentBlue: UIColor
 }
@@ -17,14 +19,16 @@ enum ThemeManager {
     static func theme(for style: UIUserInterfaceStyle) -> KeyboardTheme {
         if style == .dark {
             return KeyboardTheme(
-                keyBackground: UIColor(red: 0.42, green: 0.42, blue: 0.44, alpha: 1.0),
+                keyBackground: UIColor(red: 106.0 / 255.0, green: 106.0 / 255.0, blue: 106.0 / 255.0, alpha: 1.0),
                 specialKeyBackground: UIColor(red: 0.29, green: 0.29, blue: 0.30, alpha: 1.0),
                 keyTextColor: .white,
                 keyHighlightColor: UIColor(red: 0.60, green: 0.60, blue: 0.62, alpha: 1.0),
                 suggestionBarBackground: .clear,
                 keyboardBackground: .clear,
                 keyShadowColor: UIColor.black.withAlphaComponent(0.4),
-                popupBackground: UIColor(red: 0.25, green: 0.25, blue: 0.26, alpha: 1.0),
+                popupBackground: UIColor(red: 45.0 / 255.0, green: 45.0 / 255.0, blue: 45.0 / 255.0, alpha: 1.0),
+                keyPreviewBackground: UIColor(red: 45.0 / 255.0, green: 45.0 / 255.0, blue: 45.0 / 255.0, alpha: 1.0),
+                keyPreviewBorder: UIColor(red: 0.38, green: 0.38, blue: 0.39, alpha: 1.0),
                 popupHighlight: UIColor(red: 0.0, green: 0.48, blue: 1.0, alpha: 1.0),
                 accentBlue: UIColor(red: 0.0, green: 0.48, blue: 1.0, alpha: 1.0)
             )
@@ -38,6 +42,8 @@ enum ThemeManager {
                 keyboardBackground: .clear,
                 keyShadowColor: UIColor.black.withAlphaComponent(0.25),
                 popupBackground: .white,
+                keyPreviewBackground: .white,
+                keyPreviewBorder: UIColor.black.withAlphaComponent(0.18),
                 popupHighlight: UIColor(red: 0.0, green: 0.48, blue: 1.0, alpha: 1.0),
                 accentBlue: UIColor(red: 0.0, green: 0.48, blue: 1.0, alpha: 1.0)
             )
