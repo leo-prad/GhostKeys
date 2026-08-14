@@ -87,13 +87,14 @@ final class KeyButton: UIView {
         case .shift:
             label.isHidden = true
             iconImageView.isHidden = false
-            let config = UIImage.SymbolConfiguration(pointSize: 19, weight: .semibold)
             let name: String
+            let weight: UIImage.SymbolWeight
             switch displayString {
-            case "⇪": name = "capslock.fill"
-            case "⇧": name = "shift.fill"
-            default:  name = "shift"
+            case "⇪": name = "capslock.fill"; weight = .semibold
+            case "⇧": name = "shift.fill";    weight = .semibold
+            default:  name = "shift";          weight = .regular
             }
+            let config = UIImage.SymbolConfiguration(pointSize: 19, weight: weight)
             iconImageView.image = UIImage(systemName: name, withConfiguration: config)
         case .backspace:
             label.isHidden = true

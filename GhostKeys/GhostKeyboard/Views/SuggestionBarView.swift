@@ -136,7 +136,7 @@ final class SuggestionBarView: UIView {
                 NSLayoutConstraint.activate([
                     sep.widthAnchor.constraint(equalToConstant: 1.0 / UIScreen.main.scale),
                     sep.centerYAnchor.constraint(equalTo: centerYAnchor),
-                    sep.heightAnchor.constraint(equalTo: heightAnchor, multiplier: 0.55),
+                    sep.heightAnchor.constraint(equalTo: heightAnchor, multiplier: 0.82),
                     sep.leadingAnchor.constraint(equalTo: item.trailingAnchor)
                 ])
             }
