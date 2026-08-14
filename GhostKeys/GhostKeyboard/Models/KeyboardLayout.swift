@@ -39,7 +39,6 @@ enum KeyboardLayout {
         ],
         [
             .switch123,
-            .globe,
             .space,
             .returnKey
         ]
@@ -65,7 +64,6 @@ enum KeyboardLayout {
         ],
         [
             .switchABC,
-            .globe,
             .space,
             .returnKey
         ]
@@ -89,7 +87,6 @@ enum KeyboardLayout {
         ],
         [
             .switchABC,
-            .globe,
             .space,
             .returnKey
         ]
