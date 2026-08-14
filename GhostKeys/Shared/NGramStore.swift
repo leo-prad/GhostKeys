@@ -104,8 +104,14 @@ final class NGramStore {
     }
 
     func getLearnedWords() -> [String] {
+        // The learned dictionary is meant to show words the user has taught the
+        // keyboard — not the everyday vocabulary that already ships in the base
+        // lexicon. Filter those out so the list reflects real personalization
+        // (names, jargon, slang, deliberate additions) instead of "in", "my",
+        // "yeah", etc. that appear the moment anyone types.
+        let base = PersonalDictionary.shared.wordSet
         let set = Set(uni.keys).union(accepted.keys)
-        return Array(set).sorted()
+        return Array(set.subtracting(base)).sorted()
     }
 
     func addWord(_ word: String) {

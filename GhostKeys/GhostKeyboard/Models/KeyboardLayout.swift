@@ -5,36 +5,36 @@ enum KeyboardLayout {
     static let letters: [[KeyDefinition]] = [
         [
             .letter("q", hold: ["1"]),
-            .letter("w", hold: ["2", "ŵ"]),
-            .letter("e", hold: ["3", "è", "é", "ê", "ë", "ē", "ė", "ę"]),
-            .letter("r", hold: ["4", "ř", "ŕ", "ṙ"]),
-            .letter("t", hold: ["5", "þ", "ť", "ţ"]),
-            .letter("y", hold: ["6", "ÿ", "ý", "ŷ"]),
-            .letter("u", hold: ["7", "ù", "ú", "û", "ü", "ū", "ų", "ű"]),
-            .letter("i", hold: ["8", "ì", "í", "î", "ï", "ī", "į", "ı"]),
-            .letter("o", hold: ["9", "ò", "ó", "ô", "ö", "ø", "õ", "œ", "ō"]),
-            .letter("p", hold: ["0", "ṗ"])
+            .letter("w", hold: ["2", "ŵ", "ẃ", "ẁ", "ẇ"]),
+            .letter("e", hold: ["3", "è", "é", "ê", "ë", "ē", "ė", "ę", "ě", "ĕ"]),
+            .letter("r", hold: ["4", "ř", "ŕ", "ṙ", "ŗ"]),
+            .letter("t", hold: ["5", "þ", "ť", "ţ", "ț", "ṫ", "ṭ"]),
+            .letter("y", hold: ["6", "ÿ", "ý", "ŷ", "ỳ", "ȳ"]),
+            .letter("u", hold: ["7", "ù", "ú", "û", "ü", "ū", "ų", "ű", "ǔ", "ŭ"]),
+            .letter("i", hold: ["8", "ì", "í", "î", "ï", "ī", "į", "ı", "ĭ"]),
+            .letter("o", hold: ["9", "ò", "ó", "ô", "ö", "ø", "õ", "œ", "ō", "ő", "ǒ"]),
+            .letter("p", hold: ["0", "ṗ", "ƥ"])
         ],
         [
-            .letter("a", hold: ["@", "à", "á", "â", "ä", "æ", "ã", "å", "ā"]),
-            .letter("s", hold: ["#", "ß", "ś", "š", "ş"]),
-            .letter("d", hold: ["$", "ð", "ď", "đ", "ḋ"]),
-            .letter("f", hold: ["%", "ḟ"]),
-            .letter("g", hold: ["&", "ğ", "ġ", "ģ"]),
-            .letter("h", hold: ["-", "–", "ĥ", "ħ", "ḣ"]),
-            .letter("j", hold: ["+", "ĵ"]),
-            .letter("k", hold: ["(", "ƙ", "ḳ"]),
-            .letter("l", hold: [")", "ł", "ĺ", "ľ", "ḷ"])
+            .letter("a", hold: ["@", "à", "á", "â", "ä", "æ", "ã", "å", "ā", "ą", "ǎ", "ă"]),
+            .letter("s", hold: ["#", "ß", "ś", "š", "ş", "ŝ", "ș", "ṡ"]),
+            .letter("d", hold: ["$", "ð", "ď", "đ", "ḋ", "ḍ"]),
+            .letter("f", hold: ["%", "ḟ", "ƒ"]),
+            .letter("g", hold: ["&", "ğ", "ġ", "ģ", "ĝ", "ǧ"]),
+            .letter("h", hold: ["-", "–", "ĥ", "ħ", "ḣ", "ḥ"]),
+            .letter("j", hold: ["+", "ĵ", "ǰ"]),
+            .letter("k", hold: ["(", "ƙ", "ḳ", "ķ", "ǩ"]),
+            .letter("l", hold: [")", "ł", "ĺ", "ľ", "ļ", "ḷ", "ŀ"])
         ],
         [
             .shift,
-            .letter("z", hold: ["*", "ž", "ź", "ż"]),
-            .letter("x", hold: ["\"", "ẋ"]),
-            .letter("c", hold: ["'", "ç", "ć", "č"]),
-            .letter("v", hold: [":", "ṽ"]),
-            .letter("b", hold: [";", "ɓ", "ƀ", "ḃ"]),
-            .letter("n", hold: ["!", "ñ", "ń", "ň"]),
-            .letter("m", hold: ["?", "—", "ṁ"]),
+            .letter("z", hold: ["*", "ž", "ź", "ż", "ẑ", "ẓ"]),
+            .letter("x", hold: ["\"", "ẋ", "ẍ"]),
+            .letter("c", hold: ["'", "ç", "ć", "č", "ĉ", "ċ"]),
+            .letter("v", hold: [":", "ṽ", "ṿ"]),
+            .letter("b", hold: [";", "ɓ", "ƀ", "ḃ", "ḅ", "ḇ"]),
+            .letter("n", hold: ["!", "ñ", "ń", "ň", "ņ", "ṅ", "ṇ"]),
+            .letter("m", hold: ["?", "—", "ṁ", "ṃ"]),
             .backspace
         ],
         [
@@ -46,20 +46,36 @@ enum KeyboardLayout {
 
     static let symbols1: [[KeyDefinition]] = [
         [
-            .letter("1"), .letter("2"), .letter("3"), .letter("4"), .letter("5"),
-            .letter("6"), .letter("7"), .letter("8"), .letter("9"), .letter("0")
+            .letter("1", hold: ["¹", "①", "½", "⅓", "¼"]),
+            .letter("2", hold: ["²", "②", "⅔"]),
+            .letter("3", hold: ["³", "③", "¾"]),
+            .letter("4", hold: ["⁴", "④"]),
+            .letter("5", hold: ["⁵", "⑤", "⅕"]),
+            .letter("6", hold: ["⁶", "⑥"]),
+            .letter("7", hold: ["⁷", "⑦"]),
+            .letter("8", hold: ["⁸", "⑧"]),
+            .letter("9", hold: ["⁹", "⑨"]),
+            .letter("0", hold: ["⁰", "⓪", "°"])
         ],
         [
-            .letter("-", hold: ["–", "—", "•"]), .letter("/", hold: ["\\"]),
-            .letter(":"), .letter(";"), .letter("("), .letter(")"),
-            .letter("$", hold: ["₽", "¥", "€", "¢", "£", "₩"]),
-            .letter("&", hold: ["§"]), .letter("@"),
-            .letter("\"", hold: ["”", "“", "„", "»", "«"])
+            .letter("-", hold: ["–", "—", "•", "·", "±"]),
+            .letter("/", hold: ["\\", "÷"]),
+            .letter(":", hold: ["∶"]),
+            .letter(";", hold: ["·"]),
+            .letter("(", hold: ["[", "{", "<"]),
+            .letter(")", hold: ["]", "}", ">"]),
+            .letter("$", hold: ["₽", "¥", "€", "¢", "£", "₩", "₹", "₺", "₫"]),
+            .letter("&", hold: ["§", "¶", "†", "‡"]),
+            .letter("@", hold: ["№"]),
+            .letter("\"", hold: ["”", "“", "„", "»", "«", "‟"])
         ],
         [
             .switchSym,
-            .letter(".", hold: ["…"]), .letter(","), .letter("?", hold: ["¿"]),
-            .letter("!", hold: ["¡"]), .letter("'", hold: ["’", "‘", "`"]),
+            .letter(".", hold: ["…", "·"]),
+            .letter(",", hold: ["‚"]),
+            .letter("?", hold: ["¿", "‽"]),
+            .letter("!", hold: ["¡", "‽"]),
+            .letter("'", hold: ["’", "‘", "`", "′"]),
             .backspace
         ],
         [
@@ -71,18 +87,36 @@ enum KeyboardLayout {
 
     static let symbols2: [[KeyDefinition]] = [
         [
-            .letter("["), .letter("]"), .letter("{"), .letter("}"), .letter("#"),
-            .letter("%", hold: ["‰"]), .letter("^"), .letter("*"), .letter("+"),
-            .letter("=", hold: ["≠", "≈", "∞"])
+            .letter("[", hold: ["("]),
+            .letter("]", hold: [")"]),
+            .letter("{", hold: ["⟨"]),
+            .letter("}", hold: ["⟩"]),
+            .letter("#", hold: ["№", "♯"]),
+            .letter("%", hold: ["‰", "‱"]),
+            .letter("^", hold: ["↑", "°"]),
+            .letter("*", hold: ["×", "•", "★", "☆"]),
+            .letter("+", hold: ["±", "⁺"]),
+            .letter("=", hold: ["≠", "≈", "≤", "≥", "∞", "≡"])
         ],
         [
-            .letter("_"), .letter("\\"), .letter("|"), .letter("~"), .letter("<"),
-            .letter(">"), .letter("€"), .letter("£"), .letter("¥"), .letter("·")
+            .letter("_", hold: ["—"]),
+            .letter("\\", hold: ["/"]),
+            .letter("|", hold: ["¦", "‖"]),
+            .letter("~", hold: ["≈"]),
+            .letter("<", hold: ["≤", "«", "⟨"]),
+            .letter(">", hold: ["≥", "»", "⟩"]),
+            .letter("€", hold: ["¢"]),
+            .letter("£", hold: ["₤"]),
+            .letter("¥", hold: ["¢"]),
+            .letter("·", hold: ["•", "◦", "∙"])
         ],
         [
             .switch123,
-            .letter(".", hold: ["…"]), .letter(","), .letter("?", hold: ["¿"]),
-            .letter("!", hold: ["¡"]), .letter("'", hold: ["’", "‘", "`"]),
+            .letter(".", hold: ["…", "·"]),
+            .letter(",", hold: ["‚"]),
+            .letter("?", hold: ["¿", "‽"]),
+            .letter("!", hold: ["¡", "‽"]),
+            .letter("'", hold: ["’", "‘", "`", "′"]),
             .backspace
         ],
         [

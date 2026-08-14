@@ -107,7 +107,11 @@ final class KeyboardView: UIView {
                         k.displayString = k.definition.primary
                     }
                 case .shift:
-                    k.displayString = state.shiftMode == .capsLock ? "⇪" : "⇧"
+                    switch state.shiftMode {
+                    case .capsLock:  k.displayString = "⇪"
+                    case .uppercase: k.displayString = "⇧"
+                    case .lowercase: k.displayString = "⇧̊"
+                    }
                 case .switchMode:
                     // Set label per context (123 vs ABC vs #+=).
                     switch state.page {
@@ -130,7 +134,7 @@ final class KeyboardView: UIView {
 
         let hSpacing: CGFloat = 6
         let vSpacing: CGFloat = 6.5
-        let sideMargin: CGFloat = 3
+        let sideMargin: CGFloat = 6
         let topMargin: CGFloat = 3
         let bottomMargin: CGFloat = 3
 
@@ -145,16 +149,38 @@ final class KeyboardView: UIView {
 
             // For rows containing a .space, stretch space to fill available width.
             if let spaceIdx = row.firstIndex(where: { $0.definition.type == .space }) {
+                // Bottom row: size non-space keys so the switchMode key (123 or
+                // ABC) matches the return key width for a symmetric look. A
+                // small extra padding around the space key gives it breathing
+                // room from its neighbors, so the space doesn't butt right up
+                // against them.
+                let spaceSidePadding: CGFloat = 2
+                let returnWidth: CGFloat = KeyDefinition.returnKey.widthMultiplier * baseW
                 var fixed: CGFloat = 0
                 for (i, k) in row.enumerated() where i != spaceIdx {
-                    fixed += k.definition.widthMultiplier * baseW
+                    let mul: CGFloat
+                    if k.definition.type == .switchMode {
+                        mul = KeyDefinition.returnKey.widthMultiplier
+                    } else {
+                        mul = k.definition.widthMultiplier
+                    }
+                    fixed += mul * baseW
                 }
-                let spaceW = usableW - fixed - CGFloat(row.count - 1) * hSpacing
+                let spaceW = usableW - fixed - CGFloat(row.count - 1) * hSpacing - spaceSidePadding * 2
                 var x = sideMargin
                 for (i, k) in row.enumerated() {
-                    let keyW = (i == spaceIdx) ? spaceW : (k.definition.widthMultiplier * baseW)
-                    k.frame = CGRect(x: x, y: y, width: keyW, height: rowH)
-                    x += keyW + hSpacing
+                    let keyW: CGFloat
+                    if i == spaceIdx {
+                        keyW = spaceW
+                    } else if k.definition.type == .switchMode {
+                        keyW = returnWidth
+                    } else {
+                        keyW = k.definition.widthMultiplier * baseW
+                    }
+                    let framedX = (i == spaceIdx) ? x + spaceSidePadding : x
+                    k.frame = CGRect(x: framedX, y: y, width: keyW, height: rowH)
+                    let advance = (i == spaceIdx) ? keyW + spaceSidePadding * 2 : keyW
+                    x += advance + hSpacing
                 }
                 continue
             }
@@ -208,6 +234,10 @@ final class KeyboardView: UIView {
     }
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard bounds.contains(point), !rows.isEmpty else {
+            return super.hitTest(point, with: event)
+        }
+
         // Give delete the complete right-hand side of its row, including the
         // edge inset. There is no dead strip between the key and screen edge.
         if let backspaceRow = rows.first(where: { $0.contains(where: { $0.definition.type == .backspace }) }),
@@ -217,36 +247,38 @@ final class KeyboardView: UIView {
                                       width: bounds.maxX - backspace.frame.minX + 14,
                                       height: backspace.frame.height + 8)
             if deleteRegion.contains(point) {
-                let localPoint = convert(point, to: backspace)
-                return backspace.hitTest(localPoint, with: event) ?? backspace
+                return backspace
             }
         }
 
-        // Apple-style forgiving row hit targets: every horizontal gap and the
-        // empty side margins resolve to the nearest key in that visual row.
-        // This makes the area immediately left of A behave as A, for example.
-        for (index, row) in rows.enumerated() where !row.isEmpty {
-            let rowMinY = index == 0
-                ? row[0].frame.minY
-                : (rows[index - 1][0].frame.maxY + row[0].frame.minY) / 2
-            let rowMaxY = index == rows.count - 1
-                ? row[0].frame.maxY
-                : (row[0].frame.maxY + rows[index + 1][0].frame.minY) / 2
-            guard point.y >= rowMinY, point.y <= rowMaxY else { continue }
-
-            guard let nearest = row.min(by: {
-                abs($0.frame.midX - point.x) < abs($1.frame.midX - point.x)
-            }) else { break }
-            let localPoint = convert(point, to: nearest)
-            return nearest.hitTest(localPoint, with: event) ?? nearest
+        // Every point inside the keyboard resolves to some key. Pick the row
+        // whose vertical band is nearest to point.y (so taps just above or
+        // below a row still land), then the key in that row whose midX is
+        // nearest to point.x (so side margins and horizontal gaps resolve to
+        // the neighboring key). Return the key directly — do not delegate to
+        // its own hitTest, because point(inside:) on a KeyButton would reject
+        // the routed localPoint and iOS would drop the touch.
+        var bestRow: [KeyButton] = rows[0]
+        var bestRowDistance: CGFloat = .greatestFiniteMagnitude
+        for row in rows where !row.isEmpty {
+            let top = row[0].frame.minY
+            let bottom = row[0].frame.maxY
+            let distance: CGFloat
+            if point.y < top { distance = top - point.y }
+            else if point.y > bottom { distance = point.y - bottom }
+            else { distance = 0 }
+            if distance < bestRowDistance {
+                bestRowDistance = distance
+                bestRow = row
+            }
         }
 
-        if let backspace = rows.joined().first(where: { $0.definition.type == .backspace }),
-           backspace.frame.contains(point) {
-            let localPoint = convert(point, to: backspace)
-            return backspace.hitTest(localPoint, with: event) ?? backspace
+        guard let nearest = bestRow.min(by: {
+            abs($0.frame.midX - point.x) < abs($1.frame.midX - point.x)
+        }) else {
+            return super.hitTest(point, with: event)
         }
-        return super.hitTest(point, with: event)
+        return nearest
     }
 
     // MARK: - Popup helpers
