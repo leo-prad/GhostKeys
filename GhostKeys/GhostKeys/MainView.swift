@@ -211,32 +211,97 @@ struct TextReplacementView: View {
     @State private var showAddSheet = false
 
     var filteredItems: [TextReplacementItem] {
-        if searchText.isEmpty { return items }
-        return items.filter {
-            $0.phrase.localizedCaseInsensitiveContains(searchText) ||
-            $0.shortcut.localizedCaseInsensitiveContains(searchText)
+        let base: [TextReplacementItem]
+        if searchText.isEmpty { base = items }
+        else {
+            base = items.filter {
+                $0.phrase.localizedCaseInsensitiveContains(searchText) ||
+                $0.shortcut.localizedCaseInsensitiveContains(searchText)
+            }
         }
+        return base.sorted { $0.phrase.localizedCaseInsensitiveCompare($1.phrase) == .orderedAscending }
     }
 
+    private func sectionKey(for item: TextReplacementItem) -> String {
+        guard let first = item.phrase.first else { return "#" }
+        let up = String(first).uppercased()
+        return up.range(of: "^[A-Z]$", options: .regularExpression) != nil ? up : "#"
+    }
+
+    private var groupedItems: [(key: String, items: [TextReplacementItem])] {
+        let groups = Dictionary(grouping: filteredItems, by: sectionKey)
+        return groups.sorted { lhs, rhs in
+            if lhs.key == "#" { return false }
+            if rhs.key == "#" { return true }
+            return lhs.key < rhs.key
+        }.map { ($0.key, $0.value) }
+    }
+
+    private var presentSectionKeys: Set<String> { Set(groupedItems.map { $0.key }) }
+
+    private static let indexLetters: [String] = {
+        var out = (0..<26).map { String(UnicodeScalar(65 + $0)!) }
+        out.append("#")
+        return out
+    }()
+
     var body: some View {
-        List {
-            if filteredItems.isEmpty {
-                Text("No text replacements found")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(filteredItems) { item in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.phrase)
-                                .font(.body)
-                            Text(item.shortcut)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+        ScrollViewReader { proxy in
+            List {
+                if filteredItems.isEmpty {
+                    Text("No text replacements found")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(groupedItems, id: \.key) { group in
+                        Section(header: Text(group.key).id("section-\(group.key)")) {
+                            ForEach(group.items) { item in
+                                NavigationLink {
+                                    EditTextReplacementView(item: item) { updated in
+                                        if let idx = items.firstIndex(where: { $0.id == updated.id }) {
+                                            items[idx] = updated
+                                        }
+                                        SharedDefaults.saveTextReplacements(items)
+                                    } onDelete: {
+                                        items.removeAll { $0.id == item.id }
+                                        SharedDefaults.saveTextReplacements(items)
+                                    }
+                                } label: {
+                                    HStack {
+                                        Text(item.phrase)
+                                            .font(.body)
+                                        Spacer()
+                                        Text(item.shortcut)
+                                            .font(.body)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                            .onDelete { offsets in
+                                deleteItems(in: group.items, at: offsets)
+                            }
                         }
-                        Spacer()
                     }
                 }
-                .onDelete(perform: deleteItems)
+            }
+            .overlay(alignment: .trailing) {
+                if searchText.isEmpty && !items.isEmpty {
+                    VStack(spacing: 1) {
+                        ForEach(Self.indexLetters, id: \.self) { letter in
+                            Button {
+                                if let target = nearestSection(for: letter) {
+                                    withAnimation { proxy.scrollTo("section-\(target)", anchor: .top) }
+                                }
+                            } label: {
+                                Text(letter)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(presentSectionKeys.contains(letter) ? Color.accentColor : Color.secondary)
+                                    .frame(width: 14, height: 12)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.trailing, 2)
+                }
             }
         }
         .searchable(text: $searchText, prompt: "Search")
@@ -261,14 +326,21 @@ struct TextReplacementView: View {
         }
     }
 
-    private func deleteItems(at offsets: IndexSet) {
-        let toRemove = offsets.map { filteredItems[$0] }
+    private func nearestSection(for letter: String) -> String? {
+        let keys = groupedItems.map { $0.key }
+        if keys.contains(letter) { return letter }
+        if letter == "#" { return keys.last }
+        return keys.first { $0 >= letter } ?? keys.last
+    }
+
+    private func deleteItems(in group: [TextReplacementItem], at offsets: IndexSet) {
+        let toRemove = offsets.map { group[$0] }
         items.removeAll(where: { item in toRemove.contains(where: { $0.id == item.id }) })
         SharedDefaults.saveTextReplacements(items)
     }
 }
 
-// MARK: - Add Text Replacement Sheet
+// MARK: - Add / Edit Text Replacement
 
 struct AddTextReplacementView: View {
     @Environment(\.dismiss) private var dismiss
@@ -310,6 +382,68 @@ struct AddTextReplacementView: View {
                     }
                     .disabled(phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+            }
+        }
+    }
+}
+
+struct EditTextReplacementView: View {
+    @Environment(\.dismiss) private var dismiss
+    let item: TextReplacementItem
+    @State private var phrase: String
+    @State private var shortcut: String
+
+    var onSave: (TextReplacementItem) -> Void
+    var onDelete: () -> Void
+
+    init(item: TextReplacementItem, onSave: @escaping (TextReplacementItem) -> Void, onDelete: @escaping () -> Void) {
+        self.item = item
+        _phrase = State(initialValue: item.phrase)
+        _shortcut = State(initialValue: item.shortcut)
+        self.onSave = onSave
+        self.onDelete = onDelete
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                HStack {
+                    Text("Phrase")
+                        .frame(width: 80, alignment: .leading)
+                    TextField("Required", text: $phrase)
+                }
+                HStack {
+                    Text("Shortcut")
+                        .frame(width: 80, alignment: .leading)
+                    TextField("Optional", text: $shortcut)
+                }
+            } footer: {
+                Text("Create a shortcut that will automatically expand into the word or phrase as you type.")
+            }
+
+            Section {
+                Button(role: .destructive) {
+                    onDelete()
+                    dismiss()
+                } label: {
+                    Text("Delete Text Replacement")
+                }
+            }
+        }
+        .navigationTitle("Text Replacement")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    let trimmedPhrase = phrase.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let trimmedShortcut = shortcut.trimmingCharacters(in: .whitespacesAndNewlines)
+                    var updated = item
+                    updated.phrase = trimmedPhrase
+                    updated.shortcut = trimmedShortcut
+                    onSave(updated)
+                    dismiss()
+                }
+                .disabled(phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
     }
