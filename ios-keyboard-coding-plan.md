@@ -1,4 +1,4 @@
-# iOS Custom Keyboard — Full Build Plan for Claude Code
+# iOS Custom Keyboard — Full Build Plan
 
 ## Project Overview
 
@@ -354,7 +354,7 @@ Simple onboarding flow:
 
 ---
 
-## File Generation Order for Claude Code
+## File Generation Order
 
 Generate files in this order to minimize forward-reference issues:
 
@@ -384,7 +384,7 @@ Generate files in this order to minimize forward-reference issues:
 24. `.xcodeproj` configuration (or generate via `xcodegen` — include a `project.yml`)
 
 ### Recommendation: Use XcodeGen
-Since Claude Code can't run Xcode, generate a `project.yml` for [XcodeGen](https://github.com/yonaskolb/XcodeGen). This lets you define the entire Xcode project in YAML — targets, build settings, entitlements, Info.plists — and generate the `.xcodeproj` with one command on the borrowed Mac:
+Since the local toolchain can't run Xcode, generate a `project.yml` for [XcodeGen](https://github.com/yonaskolb/XcodeGen). This lets you define the entire Xcode project in YAML — targets, build settings, entitlements, Info.plists — and generate the `.xcodeproj` with one command on the borrowed Mac:
 ```bash
 brew install xcodegen
 xcodegen generate
