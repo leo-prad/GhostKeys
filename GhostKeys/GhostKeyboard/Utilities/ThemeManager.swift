@@ -19,8 +19,8 @@ enum ThemeManager {
     static func theme(for style: UIUserInterfaceStyle) -> KeyboardTheme {
         if style == .dark {
             return KeyboardTheme(
-                keyBackground: UIColor(red: 106.0 / 255.0, green: 106.0 / 255.0, blue: 106.0 / 255.0, alpha: 1.0),
-                specialKeyBackground: UIColor(red: 106.0 / 255.0, green: 106.0 / 255.0, blue: 106.0 / 255.0, alpha: 1.0),
+                keyBackground: UIColor(red: 0x72 / 255.0, green: 0x72 / 255.0, blue: 0x72 / 255.0, alpha: 1.0),
+                specialKeyBackground: UIColor(red: 0x72 / 255.0, green: 0x72 / 255.0, blue: 0x72 / 255.0, alpha: 1.0),
                 keyTextColor: .white,
                 keyHighlightColor: UIColor(red: 0.60, green: 0.60, blue: 0.62, alpha: 1.0),
                 suggestionBarBackground: .clear,

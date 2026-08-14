@@ -134,7 +134,7 @@ final class KeyboardView: UIView {
 
         let hSpacing: CGFloat = 6
         let vSpacing: CGFloat = 6.5
-        let sideMargin: CGFloat = 3
+        let sideMargin: CGFloat = 6
         let topMargin: CGFloat = 3
         let bottomMargin: CGFloat = 3
 
@@ -154,7 +154,7 @@ final class KeyboardView: UIView {
                 // small extra padding around the space key gives it breathing
                 // room from its neighbors, so the space doesn't butt right up
                 // against them.
-                let spaceSidePadding: CGFloat = 4
+                let spaceSidePadding: CGFloat = 2
                 let returnWidth: CGFloat = KeyDefinition.returnKey.widthMultiplier * baseW
                 var fixed: CGFloat = 0
                 for (i, k) in row.enumerated() where i != spaceIdx {
